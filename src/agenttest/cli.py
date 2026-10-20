@@ -86,6 +86,24 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="比例断言只按点估计判定（非统计显著；默认要求 95%% 置信区间也过线）",
     )
+
+    imp = subs.add_parser("import", help="把已有的模型日志导入成 cassette")
+    imp.add_argument("source", help="日志文件（.jsonl 或 .json）")
+    imp.add_argument("outdir", help="输出目录，写成 <outdir>/cassette.jsonl")
+    imp.add_argument(
+        "--format",
+        dest="fmt",
+        default="auto",
+        choices=["auto", "openai", "anthropic"],
+        help="输入格式；默认 auto 自动识别",
+    )
+    imp.add_argument(
+        "--exit-code",
+        dest="exit_code",
+        type=int,
+        default=None,
+        help="日志里没有退出码时写入的值（默认 0）",
+    )
     return parser
 
 
@@ -101,6 +119,8 @@ def main(argv: list | None = None) -> int:
         return _cmd_diff(args)
     if args.verb == "stat":
         return _cmd_stat(args)
+    if args.verb == "import":
+        return _cmd_import(args)
     parser.error("未知子命令：" + str(args.verb))
     return EXIT_FAIL
 
@@ -275,3 +295,34 @@ def _cmd_stat(args) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+def _cmd_import(args) -> int:
+    """把已有的模型日志映射成 cassette：只做映射，不假装能重放。"""
+    from .importers import ImporterError, load
+
+    fmt = None if args.fmt in (None, "auto") else args.fmt
+    try:
+        cassette = load(args.source, format=fmt, exit_code=args.exit_code)
+    except ImporterError as exc:
+        print("ERROR 导入失败：" + str(exc))
+        return 1
+
+    path = cassette.write(args.outdir)
+    counts = cassette.counts
+    print("import " + str(args.source))
+    print("  格式    " + (cassette.format or "?"))
+    print("  事件    " + str(len(cassette.events)) + " 条 " + str(counts))
+    if cassette.synthetic_timestamps:
+        print("  时间戳  日志里缺时间戳，已按顺序合成（meta.synthetic_timestamps = true，不是真实耗时）")
+    else:
+        print("  时间戳  来自日志的真实值")
+    print(
+        "  warnings " + str(len(cassette.warnings)) + " 条"
+        + ("，见 run.start.meta.warnings" if cassette.warnings else "")
+    )
+    print("  写出    " + str(path))
+    print(
+        "注意 导入的 cassette 不能 replay（日志里没有可重跑的 agent），"
+        "但可以 diff、跑断言、归档。"
+    )
+    return 0

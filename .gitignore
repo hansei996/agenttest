@@ -9,3 +9,4 @@ _batchcheck/
 _b5/
 _impcheck/
 .work/
+.agenttest-smoke/

@@ -6,6 +6,7 @@
 - **日志导入器**：`agenttest.importers.load()` 支持 OpenAI Chat Completions 与 Anthropic Messages 两种日志格式，映射为 6 类事件；缺失时间戳会合成并在 `meta.warnings` 留痕
 - **统计诚实性**：比例断言改为按 95% 置信区间判定（`>=` 看下界、`<=` 看上界）；点估计够但区间不够时默认 **FAIL**，须显式加 `--point-estimate` 才按点估计通过，并在报告里标注「非统计显著」
 - **cassette 规范**：新增 `docs/CASSETTE-SPEC.md`、`docs/cassette.schema.json` 与 `tools/validate_cassette.py`（纯标准库），第三方可据此实现兼容工具
+- **`agenttest import` 子命令**：`import <log> <outdir> [--format auto|openai|anthropic] [--exit-code N]`，把日志写成 cassette 并打印格式/事件计数/时间戳来源/warnings；导入的 cassette 明确提示不可 replay
 - **文档**：新增 ROADMAP、本 CHANGELOG；根目录 `.gitignore` 挡住 `__pycache__`/`*.egg-info`
 
 ## v0.1.0
