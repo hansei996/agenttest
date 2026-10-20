@@ -181,8 +181,9 @@ def _check_stat(expr: str, rest: str, events: list[dict]) -> AssertionResult:
     return AssertionResult(
         expr,
         False,
-        "FAIL " + expr + " — v0.1 未实现统计断言（" + rest + "）：replay 是确定的，"
-        "成功率采样属于 record 侧批量运行，见 docs/DESIGN.md 第 4 节与 docs/USAGE.md",
+        "FAIL " + expr + " — 单次 replay 里未实现统计断言（" + rest + "）：replay 是确定的，"
+        "成功率采样要用 agenttest record --repeat N，再用 "
+        "agenttest stat <batch.jsonl> --assert \"" + rest + "\"，见 docs/USAGE.md",
     )
 
 

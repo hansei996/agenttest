@@ -17,6 +17,8 @@ jobs:
           python-version: "3.12"
       - name: install dev dependency
         run: python -m pip install --upgrade pip pytest
+      - name: install package (editable)
+        run: python -m pip install -e .
       - name: pytest
         env:
           PYTHONPATH: src
@@ -32,3 +34,15 @@ jobs:
             exit 1
           fi
           python -m agenttest diff examples/good examples/bad
+      - name: console script acceptance (no PYTHONPATH)
+        run: |
+          set -eux
+          unset PYTHONPATH
+          agenttest --help
+          agenttest replay examples/good --assert before:quote_error
+          agenttest record --repeat 5 /tmp/batch -- python examples/fake_agent.py --script good
+          agenttest stat /tmp/batch/batch.jsonl --assert "success>=0.8" --assert "tokens<=20000"
+          if agenttest stat /tmp/batch --assert "tokens<=10"; then
+            echo "统计断言没有生效" >&2
+            exit 1
+          fi

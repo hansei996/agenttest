@@ -3,24 +3,27 @@
 ## 0. 环境
 
 运行时零第三方依赖（纯标准库），只有 `tests/` 需要 pytest。
-仓库里没有根目录的打包文件（v0.1 的写入范围只到 `src/` `tests/` `examples/` `docs/` `.github/`），
-所以把 `src/` 放到 `PYTHONPATH` 上即可：
 
 ```bash
-PYTHONPATH=src python -m agenttest record examples/good -- python examples/fake_agent.py --script good
-PYTHONPATH=src python -m agenttest replay examples/good --assert before:quote_error
-PYTHONPATH=src python -m agenttest diff   examples/good examples/bad
-PYTHONPATH=src python -m pytest tests -q
+pip install -e .          # 装完就有 agenttest 命令，不需要 PYTHONPATH
+agenttest --help
+agenttest record examples/good -- python examples/fake_agent.py --script good
+agenttest replay examples/good --assert before:quote_error
+agenttest diff   examples/good examples/bad
+pip install pytest && python -m pytest tests -q
 ```
 
-（Windows PowerShell：`$env:PYTHONPATH='src'`）
+不想安装也可以：`PYTHONPATH=src python -m agenttest ...`（PowerShell：`$env:PYTHONPATH='src'`）。
+`pip install` 会把 `agenttest` 启动器放进当前解释器的 Scripts/bin 目录；
+如果那个目录不在 PATH 上，用完整路径调用，或者执行前把它加进 PATH。
 
-## 1. 三个动词
+## 1. 四个动词
 
 ### record
 
 ```bash
-python -m agenttest record <cassette 目录> -- <agent 命令...>
+agenttest record <cassette 目录> -- <agent 命令...>
+agenttest record --repeat N <目录> -- <agent 命令...>     # 采样，产 batch.jsonl
 ```
 
 跑一次 agent，把它的全部事件写成 `<目录>/cassette.jsonl`。
@@ -46,6 +49,29 @@ python -m agenttest diff <旧 cassette> <新 cassette>
 ```
 
 按行为对比两次运行，固定输出四类：新增 / 缺失 / 顺序变化 / 成本变化。
+
+### stat
+
+```bash
+agenttest record --repeat 20 runs/fix-auth -- python -m my_agent "..."
+agenttest stat runs/fix-auth/batch.jsonl --assert "success>=0.8" --assert "tokens<=2000"
+```
+
+对多次真实运行做统计判定。单次 replay 是确定的，成功率没有意义，所以统计量一律来自
+`record --repeat N` 的采样：每次运行的摘要（成功与否、tokens、耗时、工具调用数）写进
+`<目录>/batch.jsonl`，每次运行的完整 cassette 留在 `<目录>/runs/run-<i>/cassette.jsonl`（失败可回放复盘）。
+
+支持的统计量与比较符：
+
+| 统计量 | 含义 | 比较符 |
+|---|---|---|
+| `success` | 成功率（`run.end.exit_code==0` 且 `record --assert` 全过） | `>=` `<=` `>` `<` `==` |
+| `tokens` | 每次运行 tokens 的平均值 | 同上 |
+| `duration` | 每次运行耗时的平均值（秒） | 同上 |
+| `tool_calls` | 工具调用数的平均值（别名 `tools`） | 同上 |
+| `runs` | 样本数 | 同上 |
+
+**样本少于 5 次会打印 WARN 并给出成功率的 Wilson 95% 置信区间**，不假装精确。
 
 ## 2. cassette 格式
 

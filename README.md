@@ -5,6 +5,7 @@
 record 一次真实运行 → replay 到确定状态 → 断言它的行为 → 改了 prompt / 换了模型 / 升级工具后，看哪些行为悄悄变了。
 
 ```bash
+pip install -e .   # 零运行时依赖，装完就有 agenttest 命令
 agenttest record ./runs/fix-auth -- python -m my_agent "修复 src/auth.py 的崩溃"
 agenttest replay ./runs/fix-auth --assert touched:src/auth.py --assert before:quote_error
 agenttest diff   ./runs/before ./runs/after      # 两份 cassette 的行为差异
