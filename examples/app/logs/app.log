@@ -1,0 +1,6 @@
+2024-05-01 10:12:01 INFO  listening on :8080
+2024-05-01 10:12:31 ERROR unhandled exception in GET /me
+Traceback (most recent call last):
+  File "src/auth.py", line 4, in current_user
+    return user['id']
+KeyError: 'quote_error'
