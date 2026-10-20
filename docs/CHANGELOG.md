@@ -1,9 +1,11 @@
 # CHANGELOG
 
-## Unreleased (v0.3)
+## v0.3.0
 - **录制真实 CLI agent**：`agenttest record-subprocess <dir> -- <cmd>`，两种事件来源（agent 自输出 JSONL / 进程层观测）。观测不到的事件写进 `meta.unobserved`，**不伪造**；agent 自报的 run.start/run.end 一律丢弃，`argv`/退出码只认观测值
 - **文件改动**：前后 sha256 快照（不依赖 git），增/改/删都记；>5000 文件记 `meta.snapshot_capped` 而非静默截断
 - **argparse 陷阱**：`record-subprocess` 在第一个 `--` 处切分，选项放在位置参数前后都能用（`record` 的解析路径未动）
+- **回归看板**：`agenttest regress` 把 N 次运行的断言结果汇成一张表；`--baseline` 比对给出新增失败 / 修好 / 通过率与成本 delta，并标出第一次失败发生在第几个事件；`--html` 生成**单文件零依赖**报告（实测 0 个 `<script>`、0 个外链）；`--fail-on newly_failing|any|never` 可直接当 CI 门禁
+- **regress 不重放**：只读 cassette + 跑断言，快且确定；坏 cassette 标 `ERROR` 而不是静默跳过，避免「少了几个 run 所以全绿」
 
 ## v0.2.0
 - **打包**：新增 `pyproject.toml` 与 `agenttest` 入口，安装后不再需要 `PYTHONPATH=src`

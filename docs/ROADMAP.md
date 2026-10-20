@@ -10,13 +10,13 @@
 | v0.1 | 能跑：cassette + 确定性 replay + 断言 + diff | 39 测试，CI 绿 |
 | **v0.2** | 能用：可安装、统计断言、日志导入、pytest 插件、cassette 规范 + 第三方独立实现、BOM 容忍 | 153 测试，CI 绿 |
 
-## v0.3 —— 多次运行的回归看板（进行中）
+## v0.3 —— 多次运行的回归看板（已完成，v0.3.0）
 
 - `agenttest regress`：一批 run 的断言结果汇总成 Report
 - 基线比对：`newly_failing` / `fixed` / 通过率与成本 delta，每个新失败标出第几个事件
 - 单文件 HTML 报告（零外部依赖，离线可开）
 - 退出码策略：`--fail-on newly_failing|any|never`，可直接当 CI 门禁
-**验收数字**：用 good/bad 两组跑出看板，bad 侧被标为退步；HTML 含失败详情；CI 绿。
+**验收数字**：good/bad 两组跑出看板，bad 侧被标退步；HTML 单文件零依赖且含失败详情；CI 绿（189 passed）。**已发布 v0.3.0。**
 
 ## v0.4 —— 让"退步"可被量化
 
