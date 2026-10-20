@@ -11,6 +11,13 @@ agenttest replay ./runs/fix-auth --assert touched:src/auth.py --assert before:qu
 agenttest diff   ./runs/before ./runs/after      # 两份 cassette 的行为差异
 ```
 
+离线装不上时（`pip install -e .` 的 build isolation 要联网拉 setuptools，`--no-build-isolation` 在没有 setuptools 的解释器上会报 BackendUnavailable）：
+直接 `PYTHONPATH=src python -m agenttest ...` 从源码跑，或先在有网时装好 setuptools 再安装。
+
+离线环境装不上（`pip install -e .` 的 build isolation 需要联网拉 setuptools，
+而 `--no-build-isolation` 在没有 setuptools 的解释器上会报 BackendUnavailable）：
+直接用 `PYTHONPATH=src python -m agenttest ...` 从源码跑，或者先在有网时装好 setuptools 再安装。
+
 ## 为什么需要它
 
 agent 有三类问题，现有测试全都测不到：

@@ -24,6 +24,8 @@ MIN_SAMPLE = 5
 Z_95 = 1.96
 
 METRICS = ("success", "tokens", "duration", "tool_calls", "runs")
+# 比例型统计量：只靠点估计判定会把"没证据"说成"证明了"，必须看置信区间。
+PROPORTION_METRICS = ("success",)
 METRIC_ALIASES = {"tool_calls": "tool_calls", "tools": "tool_calls", "tool": "tool_calls"}
 OPS = (">=", "<=", "==", ">", "<")
 OP_WORDS = {">=": "≥", "<=": "≤", "==": "=", ">": ">", "<": "<"}
@@ -194,27 +196,105 @@ def _format_value(metric: str, value: float) -> str:
     return f"{int(value)}"
 
 
-def evaluate_stat(assertion: StatAssertion, stats: BatchStats) -> StatResult:
+def _compare(value: float, op: str, threshold: float) -> bool:
+    if op == ">=":
+        return value >= threshold
+    if op == "<=":
+        return value <= threshold
+    if op == ">":
+        return value > threshold
+    if op == "<":
+        return value < threshold
+    return math.isclose(value, threshold, rel_tol=1e-9, abs_tol=1e-9)
+
+
+def evaluate_stat(
+    assertion: StatAssertion, stats: BatchStats, point_estimate: bool = False
+) -> StatResult:
+    """比例型断言看置信区间；确定性量（tokens/耗时/工具调用）照旧按实测值。"""
+    if assertion.metric in PROPORTION_METRICS:
+        return _evaluate_proportion(assertion, stats, point_estimate)
     measured = stats.value(assertion.metric)
-    verdict = {
-        ">=": measured >= assertion.threshold,
-        "<=": measured <= assertion.threshold,
-        "==": math.isclose(measured, assertion.threshold, rel_tol=1e-9, abs_tol=1e-9),
-        ">": measured > assertion.threshold,
-        "<": measured < assertion.threshold,
-    }[assertion.op]
+    verdict = _compare(measured, assertion.op, assertion.threshold)
     word = "PASS" if verdict else "FAIL"
     measured_text = _format_value(assertion.metric, measured)
     threshold_text = _format_value(assertion.metric, assertion.threshold)
-    tail = "达到要求" if verdict else (
-        "低于阈值" if assertion.op in (">=", ">") else "超过阈值"
-    )
+    tail = "达到要求" if verdict else ("低于阈值" if assertion.op in (">=", ">") else "超过阈值")
     return StatResult(
         expr=assertion.expr,
         ok=verdict,
         message=(
             f"{word} {assertion.expr} — 实测 {measured_text}"
             f"（{OP_WORDS[assertion.op]} {threshold_text}）{'' if verdict else '，' + tail}"
+        ),
+    )
+
+
+def _evaluate_proportion(
+    assertion: StatAssertion, stats: BatchStats, point_estimate: bool
+) -> StatResult:
+    """success>=X：默认要求 95% 置信区间的下界也过线，否则就是"没证据"。
+
+    点估计 1.00 在 n=3 时的 95% 区间下界只有 0.44：那不叫证明了 >=0.99。
+    """
+    point = stats.success
+    low, high = wilson_interval(stats.successes, stats.runs)
+    counts = f"{stats.successes}/{stats.runs}"
+    point_text = f"点估计 {point:.2f}（{counts}）"
+    threshold_text = f"{assertion.threshold:.2f}"
+    ci_text = f"95% 置信区间 {low:.2f}–{high:.2f}"
+
+    if assertion.op in (">=", ">"):
+        bound, bound_name = low, "下界"
+    elif assertion.op in ("<=", "<"):
+        bound, bound_name = high, "上界"
+    else:  # ==：比例上的"等于"需要区间退化，正常样本永远证不出来
+        bound, bound_name = None, "区间"
+
+    naive = _compare(point, assertion.op, assertion.threshold)
+    if bound is None:
+        proven = math.isclose(
+            low, assertion.threshold, rel_tol=1e-9, abs_tol=1e-9
+        ) and math.isclose(high, assertion.threshold, rel_tol=1e-9, abs_tol=1e-9)
+        bound_text = "区间需要退化到阈值才算证明"
+    else:
+        proven = _compare(bound, assertion.op, assertion.threshold)
+        bound_text = f"{bound_name} {bound:.2f}"
+
+    if proven and naive:
+        return StatResult(
+            expr=assertion.expr,
+            ok=True,
+            message=(
+                f"PASS {assertion.expr} — {point_text}，{ci_text}，{bound_text} "
+                f"满足 {OP_WORDS[assertion.op]} {threshold_text}"
+            ),
+        )
+    if naive and point_estimate:
+        return StatResult(
+            expr=assertion.expr,
+            ok=True,
+            message=(
+                f"PASS {assertion.expr} — {point_text} 满足 {OP_WORDS[assertion.op]} "
+                f"{threshold_text}；按点估计通过，非统计显著（{ci_text}，{bound_text}）"
+            ),
+        )
+    if naive:
+        return StatResult(
+            expr=assertion.expr,
+            ok=False,
+            message=(
+                f"FAIL {assertion.expr} — {point_text}，但 {ci_text}，{bound_text} "
+                f"未达 {OP_WORDS[assertion.op]} {threshold_text}：样本不足，无法证明该阈值"
+                "（只想按点估计判就用 --point-estimate，但那就不是统计显著了）"
+            ),
+        )
+    return StatResult(
+        expr=assertion.expr,
+        ok=False,
+        message=(
+            f"FAIL {assertion.expr} — {point_text}，{ci_text}，{bound_text} "
+            f"未达 {OP_WORDS[assertion.op]} {threshold_text}，点估计本身就不够"
         ),
     )
 
@@ -247,9 +327,16 @@ def confidence_note(stats: BatchStats) -> str | None:
 
 
 # -- 报告 ---------------------------------------------------------------
-def format_report(batch_label: str, stats: BatchStats, results: list) -> str:
+def format_report(
+    batch_label: str, stats: BatchStats, results: list, point_estimate: bool = False
+) -> str:
     low, high = wilson_interval(stats.successes, stats.runs)
     lines = [f"batch {batch_label} — {stats.runs} 次运行"]
+    if point_estimate:
+        lines.append(
+            "WARN --point-estimate：比例断言只按点估计判定，这不是统计显著，"
+            "只能说明观测到的比例如此"
+        )
     lines.append(
         f"  成功      {stats.success * 100:.0f}%  ({stats.successes}/{stats.runs})"
         f" · 95% 置信区间 {low:.2f}–{high:.2f}"
@@ -260,6 +347,11 @@ def format_report(batch_label: str, stats: BatchStats, results: list) -> str:
         )
         lines.append(f"  耗时      {stats.mean_duration:.3f}s 平均")
         lines.append(f"  工具调用  {stats.mean_tool_calls:.1f} 平均")
+        if all(value == 0 for value in stats.durations):
+            lines.append(
+                "  提示      所有运行的 duration 都是 0.000s：这个 agent 没有可测量的耗时"
+                "（例如假 agent），duration 断言在这里没有意义，别当成有效统计"
+            )
     note = confidence_note(stats)
     if note:
         lines.append(note)

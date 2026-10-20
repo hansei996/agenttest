@@ -60,13 +60,18 @@ def test_evaluate_stat_prints_measured_value():
     stats = st.summarize_batch(
         batch_of([True, True, False, True, False], [1000] * 5, [1.0] * 5, [3] * 5)
     )
-    passed = st.evaluate_stat(st.parse_stat_assertion("success>=0.5"), stats)
+    # 确定性量照旧按实测值判定
+    passed = st.evaluate_stat(st.parse_stat_assertion("tokens<=1000"), stats)
     assert passed.ok is True
-    assert "实测 0.60" in passed.message
+    assert "实测 1,000" in passed.message
     failed = st.evaluate_stat(st.parse_stat_assertion("tokens<=500"), stats)
     assert failed.ok is False
     assert "实测 1,000" in failed.message
     assert "超过阈值" in failed.message
+    # 比例量给的是点估计 + 置信区间，不是"实测"
+    proportion = st.evaluate_stat(st.parse_stat_assertion("success>=0.5"), stats)
+    assert proportion.ok is False  # 点估计 0.60 够，95% 下界 0.23 不够
+    assert "点估计 0.60（3/5）" in proportion.message
 
 
 def test_wilson_interval_is_honest_about_small_samples():
@@ -132,13 +137,14 @@ def test_cli_record_repeat_and_stat_pass(run, tmp_path, repo):
         "stat",
         str(tmp_path / "batch" / "batch.jsonl"),
         "--assert",
-        "success>=0.8",
+        "success>=0.5",  # n=5 全成功时 95% 下界 0.57，只有 <=0.57 的阈值才默认成立
         "--assert",
         "tokens<=20000",
     )
     assert verdict.returncode == 0, verdict.stdout + verdict.stderr
-    assert "实测 1.00" in verdict.stdout
-    assert "PASS success>=0.8" in verdict.stdout
+    assert "点估计 1.00（5/5）" in verdict.stdout
+    assert "PASS success>=0.5" in verdict.stdout
+    assert "实测 20,000" not in verdict.stdout
 
 
 def test_cli_stat_fails_when_threshold_misses(run, tmp_path):
@@ -211,3 +217,122 @@ def test_cli_stat_rejects_broken_assertion(run, tmp_path):
     verdict = run("stat", str(tmp_path / "b"), "--assert", "cash>=0.8")
     assert verdict.returncode != 0
     assert "未知统计量" in verdict.stderr
+
+
+def three_of_three():
+    return st.summarize_batch(batch_of([True] * 3, [100] * 3, [0.5] * 3, [4] * 3))
+
+
+def five_of_five():
+    return st.summarize_batch(batch_of([True] * 5, [100] * 5, [0.5] * 5, [4] * 5))
+
+
+def test_proportion_needs_the_ci_bound_not_the_point_estimate():
+    result = st.evaluate_stat(st.parse_stat_assertion("success>=0.99"), three_of_three())
+    assert result.ok is False
+    assert "点估计 1.00（3/3）" in result.message
+    assert "95% 置信区间 0.44–1.00" in result.message
+    assert "下界 0.44" in result.message
+    assert "样本不足，无法证明该阈值" in result.message
+
+
+def test_point_estimate_escape_hatch_is_marked_as_not_significant():
+    result = st.evaluate_stat(
+        st.parse_stat_assertion("success>=0.99"), three_of_three(), point_estimate=True
+    )
+    assert result.ok is True
+    assert "按点估计通过，非统计显著" in result.message
+    assert "点估计 1.00（3/3）" in result.message
+
+
+def test_five_successes_still_cannot_prove_point_eight():
+    # Wilson(5,5) 的下界是 0.566：0.57 都还差一点，0.8 更不可能
+    stats = five_of_five()
+    assert st.evaluate_stat(st.parse_stat_assertion("success>=0.8"), stats).ok is False
+    assert st.evaluate_stat(st.parse_stat_assertion("success>=0.57"), stats).ok is False
+    passing = st.evaluate_stat(st.parse_stat_assertion("success>=0.56"), stats)
+    assert passing.ok is True
+    assert "下界 0.57" in passing.message
+
+
+def test_proportion_point_estimate_also_flags_a_real_miss():
+    stats = st.summarize_batch(batch_of([True, False, False], [1, 1, 1], [1, 1, 1], [1, 1, 1]))
+    result = st.evaluate_stat(
+        st.parse_stat_assertion("success>=0.9"), stats, point_estimate=True
+    )
+    assert result.ok is False
+    assert "点估计 0.33（1/3）" in result.message
+
+
+def test_numeric_metrics_ignore_the_confidence_interval():
+    stats = three_of_three()
+    assert st.evaluate_stat(st.parse_stat_assertion("tokens<=20000"), stats).ok is True
+    assert st.evaluate_stat(st.parse_stat_assertion("tools<=4"), stats).ok is True
+    assert st.evaluate_stat(st.parse_stat_assertion("tools<=3"), stats).ok is False
+
+
+def test_report_flags_all_zero_durations():
+    stats = st.summarize_batch(batch_of([True] * 5, [10] * 5, [0.0] * 5, [1] * 5))
+    report = st.format_report("b.jsonl", stats, [])
+    assert "所有运行的 duration 都是 0.000s" in report
+
+
+def test_report_warns_when_point_estimate_is_used():
+    report = st.format_report("b.jsonl", five_of_five(), [], point_estimate=True)
+    assert "--point-estimate" in report and "不是统计显著" in report
+
+
+def test_cli_small_sample_cannot_prove_a_high_threshold(run, tmp_path):
+    proc = run(
+        "record",
+        "--repeat",
+        "3",
+        str(tmp_path / "three"),
+        "--",
+        sys.executable,
+        "examples/fake_agent.py",
+        "--script",
+        "good",
+    )
+    assert proc.returncode == 0, proc.stderr
+    verdict = run("stat", str(tmp_path / "three"), "--assert", "success>=0.99")
+    assert verdict.returncode == 1
+    assert "样本不足，无法证明该阈值" in verdict.stdout
+    assert "FAIL success>=0.99" in verdict.stdout
+
+
+def test_cli_point_estimate_flag_allows_exit_zero(run, tmp_path):
+    run(
+        "record",
+        "--repeat",
+        "3",
+        str(tmp_path / "three"),
+        "--",
+        sys.executable,
+        "examples/fake_agent.py",
+        "--script",
+        "good",
+    )
+    verdict = run(
+        "stat", str(tmp_path / "three"), "--assert", "success>=0.99", "--point-estimate"
+    )
+    assert verdict.returncode == 0, verdict.stdout + verdict.stderr
+    assert "非统计显著" in verdict.stdout
+
+
+def test_cli_five_runs_cannot_prove_point_eight(run, tmp_path):
+    run(
+        "record",
+        "--repeat",
+        "5",
+        str(tmp_path / "five"),
+        "--",
+        sys.executable,
+        "examples/fake_agent.py",
+        "--script",
+        "good",
+    )
+    verdict = run("stat", str(tmp_path / "five"), "--assert", "success>=0.8")
+    assert verdict.returncode == 1
+    assert "下界 0.57" in verdict.stdout
+

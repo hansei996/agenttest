@@ -81,6 +81,11 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="EXPR",
         help="统计断言，可重复：success>=0.8 / tokens<=2000 / duration<=5 ...",
     )
+    sta.add_argument(
+        "--point-estimate",
+        action="store_true",
+        help="比例断言只按点估计判定（非统计显著；默认要求 95%% 置信区间也过线）",
+    )
     return parser
 
 
@@ -254,9 +259,12 @@ def _cmd_stat(args) -> int:
     except (st.StatError, CassetteError) as exc:
         print("ERROR " + str(exc), file=sys.stderr)
         return EXIT_FAIL
-    results = [st.evaluate_stat(assertion, stats) for assertion in assertions]
+    point_estimate = bool(getattr(args, "point_estimate", False))
+    results = [
+        st.evaluate_stat(assertion, stats, point_estimate) for assertion in assertions
+    ]
     label = str(st.batch_path(args.path))
-    print(st.format_report(label, stats, results))
+    print(st.format_report(label, stats, results, point_estimate))
     if all(result.ok for result in results):
         print("PASS " + label + " (" + str(len(results)) + " 条统计断言通过)")
         return EXIT_OK

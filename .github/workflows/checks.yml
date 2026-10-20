@@ -41,8 +41,14 @@ jobs:
           agenttest --help
           agenttest replay examples/good --assert before:quote_error
           agenttest record --repeat 5 /tmp/batch -- python examples/fake_agent.py --script good
-          agenttest stat /tmp/batch/batch.jsonl --assert "success>=0.8" --assert "tokens<=20000"
+          # n=5 全成功时 95% 置信区间下界只有 0.57，所以 0.5 能过、0.8 不能
+          agenttest stat /tmp/batch/batch.jsonl --assert "success>=0.5" --assert "tokens<=20000"
           if agenttest stat /tmp/batch --assert "tokens<=10"; then
             echo "统计断言没有生效" >&2
             exit 1
           fi
+          if agenttest stat /tmp/batch --assert "success>=0.99"; then
+            echo "n=5 的置信区间下界 0.57 证不出 0.99，默认必须 FAIL" >&2
+            exit 1
+          fi
+          agenttest stat /tmp/batch --assert "success>=0.99" --point-estimate
