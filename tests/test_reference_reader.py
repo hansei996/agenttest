@@ -150,3 +150,32 @@ def test_reference_reader_does_not_depend_on_the_implementation():
     assert "agenttest" not in imported
     assert "validate_cassette" not in imported
     assert imported <= {"__future__", "json", "sys", "hashlib", "pathlib"}, imported
+
+
+# --- 编码与 BOM -------------------------------------------------------------
+
+
+def test_reference_reader_accepts_a_bom(workdir):
+    """带 BOM 的同一份 cassette 必须读到同一批记录、同一个链头。"""
+    raw = GOOD.read_bytes()
+    path = workdir / "cassette.jsonl"
+    path.write_bytes(b"\xef\xbb\xbf" + raw)
+
+    with_bom = run_reader(str(path))
+    without = run_reader(str(GOOD))
+    assert with_bom.returncode == 0, with_bom.stdout + with_bom.stderr
+    head_bom = with_bom.stdout.split("chain head: ")[1].strip()
+    head_plain = without.stdout.split("chain head: ")[1].strip()
+    assert head_bom == head_plain
+    assert "OK 20 条记录" in with_bom.stdout
+
+
+def test_reference_reader_rejects_utf16_with_advice(workdir):
+    path = workdir / "cassette.jsonl"
+    path.write_bytes(GOOD.read_text(encoding="utf-8").encode("utf-16"))
+
+    result = run_reader(str(path))
+    assert result.returncode == 1
+    assert "UTF-16" in result.stdout
+    assert "另存为 UTF-8（无 BOM）" in result.stdout
+

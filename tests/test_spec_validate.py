@@ -299,3 +299,73 @@ def test_reference_writer_output_passes(workdir):
     cas.write_cassette(workdir / "fresh", events)
     result = run_tool(str(workdir / "fresh"))
     assert result.returncode == 0, result.stdout
+
+
+# --- 编码与 BOM（Windows 上最容易踩的坑）------------------------------------
+
+
+def test_bom_prefixed_cassette_is_accepted(workdir):
+    """记事本存出来的 UTF-8 BOM 不该让一份合法 cassette 判非法。"""
+    raw = GOOD.read_bytes()
+    assert not raw.startswith(b"\xef\xbb\xbf")
+    path = workdir / "cassette.jsonl"
+    path.write_bytes(b"\xef\xbb\xbf" + raw)
+
+    result = run_tool(str(path))
+    assert result.returncode == 0, result.stdout
+    assert "PASS: 1/1" in result.stdout
+
+
+def test_utf16_cassette_fails_with_actionable_advice(workdir):
+    """非 UTF-8 编码要拒绝，但报错必须是人话 + 可操作建议。"""
+    text = GOOD.read_text(encoding="utf-8")
+    path = workdir / "cassette.jsonl"
+    path.write_bytes(text.encode("utf-16"))
+
+    result = run_tool(str(path))
+    assert result.returncode == 1
+    assert "UTF-16" in result.stdout
+    assert "另存为 UTF-8（无 BOM）" in result.stdout
+
+
+def test_bom_mention_always_carries_actionable_advice(workdir):
+    """凡是报错里提到 BOM，就必须同时给出怎么办，不能只说 Unexpected BOM。"""
+    samples = [
+        GOOD.read_text(encoding="utf-8").encode("utf-16"),      # UTF-16 的 BOM
+        b"\xef\xbb\xbf" + b"not json at all",                   # UTF-8 BOM + 坏内容
+        b"\xff\xfe" + b"garbage",                               # 只给 UTF-16 BOM
+    ]
+    for index, payload in enumerate(samples):
+        path = workdir / ("bom-" + str(index) + ".jsonl")
+        path.write_bytes(payload)
+        result = run_tool(str(path))
+        assert result.returncode == 1
+        for line in result.stdout.splitlines():
+            if "BOM" in line:
+                assert "另存为" in line or "utf-8-sig" in line, line
+
+
+def test_every_file_we_write_has_no_bom(workdir):
+    """写出去一律不带 BOM：实现写的、测试写的、仓库里已有的，首字节都不是 EF BB BF。"""
+    from agenttest import cassette as cas
+
+    events = [record["event"] for record in records_of(GOOD)]
+    written = cas.write_cassette(workdir / "fresh", events)
+    assert written.read_bytes()[:3] != b"\xef\xbb\xbf"
+
+    sample = write_sample(workdir, rebuild(records_of(GOOD)), "sample.jsonl")
+    assert sample.read_bytes()[:3] != b"\xef\xbb\xbf"
+
+    assert GOOD.read_bytes()[:3] != b"\xef\xbb\xbf"
+    assert (REPO / "examples" / "bad" / "cassette.jsonl").read_bytes()[:3] != b"\xef\xbb\xbf"
+
+
+def test_json_array_gets_a_jsonl_hint(workdir):
+    """把 JSONL 存成 JSON 数组也是一种"看着像 JSON"的坑，报错要指出 JSONL。"""
+    records = records_of(GOOD)
+    path = write_sample(workdir, json.dumps(records, ensure_ascii=False), "array.jsonl")
+
+    result = run_tool(str(path))
+    assert result.returncode == 1
+    assert "JSONL" in result.stdout
+

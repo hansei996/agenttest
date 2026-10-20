@@ -13,6 +13,10 @@
 
 规则编号与 docs/CASSETTE-SPEC.md 的表格一一对应。规范里标了「未强制」的条目不在
 本工具的判定范围内；用 --list-rules 看本工具认哪 12 条。
+
+编码：输入按 UTF-8 读取并容忍开头/行首的 BOM（Windows 记事本最爱加），容忍 CRLF 与
+CRLF/LF 混排、容忍文件末尾缺换行、容忍空行。写出侧与本工具无关；规范要求写出去的
+字节**不带 BOM**（见 docs/CASSETTE-SPEC.md「编码与 BOM」一节）。
 """
 
 from __future__ import annotations
@@ -103,6 +107,30 @@ def digest(obj) -> str:
     return hashlib.sha256(canonical(obj).encode("utf-8")).hexdigest()
 
 
+BOM = "\ufeff"
+BOM_HELP = "请把文件另存为 UTF-8（无 BOM），或用 encoding=\"utf-8-sig\" 读取。"
+
+
+def _read_text(path: Path) -> str:
+    """按 UTF-8 读入，吃掉 BOM；读不动时给人话，而不是一句 Unexpected BOM。
+
+    utf-8-sig 在文件没有 BOM 时行为与 utf-8 完全一致，所以这是纯粹的"放宽输入"。
+    """
+    raw = path.read_bytes()
+    if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+        raise ValueError(
+            "文件看起来是 UTF-16（开头有 UTF-16 的 BOM），不是 UTF-8。"
+            + BOM_HELP
+        )
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError(
+            "不是合法的 UTF-8 文本（%s）：多半是 GBK/ANSI 存档，或者文件里混了别的编码。%s"
+            % (exc, BOM_HELP)
+        ) from exc
+
+
 def cassette_path(target: Path) -> Path:
     if target.name.lower().endswith(".jsonl"):
         return target
@@ -122,7 +150,10 @@ def validate_text(text: str) -> list:
     """校验一份 JSONL 文本，返回 Finding 列表（PASS / FAIL 混排）。"""
     findings = []
     raw_lines = text.splitlines()
-    numbered = [(i + 1, line) for i, line in enumerate(raw_lines) if line.strip()]
+    # 行首多余的 BOM 也吃掉（拼接过多份文件时常见）；这只是读取期的宽容，
+    # 不改变"写出去不许带 BOM"的规定。
+    stripped = [line[1:] if line.startswith(BOM) else line for line in raw_lines]
+    numbered = [(i + 1, line) for i, line in enumerate(stripped) if line.strip()]
 
     # S1：能否逐行解析成 JSON 对象
     records = []
@@ -143,6 +174,14 @@ def validate_text(text: str) -> list:
             ["第 %d 行不是合法 JSON（%s）" % (n, e) for n, e in bad_json]
             + ["第 %d 行不是 JSON 对象而是 %s" % (n, t) for n, t in bad_obj]
         )
+        head = numbered[0][1].lstrip() if numbered else ""
+        if head.startswith("["):
+            detail += (
+                "。注意：cassette 是 JSONL（一行一条记录），不是 JSON 数组；"
+                "把外层的 [ ] 去掉、每条记录独立成行再试"
+            )
+        elif "BOM" in detail:
+            detail += "。" + BOM_HELP
         findings.append(Finding(False, "S1", detail))
     elif not records:
         findings.append(Finding(False, "S1", "文件里没有任何记录（空 cassette 不合法）"))
@@ -273,9 +312,9 @@ def validate_path(target: Path) -> list:
     if not path.is_file():
         return [Finding(False, "S1", "找不到 cassette：%s" % path)]
     try:
-        text = path.read_text(encoding="utf-8")
-    except UnicodeDecodeError as exc:
-        return [Finding(False, "S1", "不是合法的 UTF-8：%s" % exc)]
+        text = _read_text(path)
+    except ValueError as exc:
+        return [Finding(False, "S1", str(exc))]
     return validate_text(text)
 
 

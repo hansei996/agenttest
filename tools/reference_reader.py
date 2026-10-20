@@ -42,6 +42,21 @@ def _force_utf8() -> None:
             pass
 
 
+BOM = "\ufeff"
+BOM_HELP = "请把文件另存为 UTF-8（无 BOM），或用 encoding=\"utf-8-sig\" 读取。"
+
+
+def read_text(path: Path) -> str:
+    """按 UTF-8 读入并吃掉 BOM。没有 BOM 时与 utf-8 完全一致（utf-8-sig 的语义）。"""
+    raw = path.read_bytes()
+    if raw.startswith(b"\xff\xfe") or raw.startswith(b"\xfe\xff"):
+        raise Bad("文件看起来是 UTF-16（开头是 UTF-16 的 BOM），不是 UTF-8。" + BOM_HELP)
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise Bad("不是合法的 UTF-8 文本（%s）。%s" % (exc, BOM_HELP)) from exc
+
+
 def canonical(obj) -> str:
     """规范 3.1：键排序、紧凑分隔符、非 ASCII 不转义。"""
     return json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -58,9 +73,11 @@ def read_cassette(path: Path):
     if not path.is_file():
         raise Bad("找不到 cassette：" + str(path))
     prev, head, counts, total = None, None, {}, 0
-    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for lineno, line in enumerate(read_text(path).splitlines(), start=1):
         if not line.strip():
             continue
+        if line.startswith(BOM):  # 行首多余的 BOM 也容忍（拼接过的文件常见）
+            line = line[1:]
         try:
             record = json.loads(line)
         except ValueError as exc:
