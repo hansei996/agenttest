@@ -1,4 +1,4 @@
-"""CLI：四个动词 record / replay / diff / stat（argparse，不引第三方库）。"""
+"""CLI：record / record-subprocess / replay / diff / stat / import（argparse，不引第三方库）。"""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from . import adapters
 from . import assertions as asrt
 from . import stat as st
 from .cassette import CassetteError, cassette_path, read_cassette
@@ -29,7 +30,7 @@ def _force_utf8() -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="agenttest",
-        description="把 agent 的行为当代码来测：record / replay / diff / stat",
+        description="把 agent 的行为当代码来测：record / record-subprocess / replay / diff / stat / import",
     )
     subs = parser.add_subparsers(dest="verb", required=True)
 
@@ -56,6 +57,36 @@ def build_parser() -> argparse.ArgumentParser:
         help="要录制的 agent 命令，写在 -- 之后",
     )
 
+    rsp = subs.add_parser(
+        "record-subprocess",
+        help="录制一个真实 CLI agent 的一次运行（只记进程层能观测到的东西）",
+        description=(
+            "录制一个真实 CLI agent 的一次运行。要跑的命令写在 -- 之后："
+            "agenttest record-subprocess <dir> [选项] -- <命令>。"
+            "选项放在 -- 前后都行。"
+        ),
+    )
+    rsp.add_argument("target", help="cassette 目录，例如 cassettes/run1")
+    rsp.add_argument(
+        "--timeout",
+        type=float,
+        default=None,
+        metavar="SECONDS",
+        help="超过这个秒数就杀掉子进程并报错（默认不设上限）",
+    )
+    rsp.add_argument(
+        "--stream-limit",
+        type=int,
+        default=adapters.DEFAULT_STREAM_LIMIT,
+        metavar="N",
+        help="stdout / stderr 各保留多少字符（默认 %(default)s）",
+    )
+    rsp.add_argument("--cwd", default=None, help="子进程的工作目录（默认当前目录）")
+    rsp.add_argument(
+        "--watch",
+        default=None,
+        help="比较文件改动的工作目录（默认等于 --cwd）",
+    )
     rep = subs.add_parser("replay", help="按 cassette 重放并跑断言")
     rep.add_argument("target", help="cassette 目录，例如 examples/bad")
     rep.add_argument(
@@ -107,12 +138,29 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _split_command(argv: list) -> tuple:
+    """把 record-subprocess 的 "--" 之后的部分单独摘出来。
+
+    argparse 的 REMAINDER 会把 target 之后的选项也吞进 command（
+    "record-subprocess DIR --cwd . -- cmd" 会变成 command=['--cwd', ...]）。
+    这里先按第一个 "--" 切开，选项就写在哪儿都行了。
+    """
+    if not argv or argv[0] != "record-subprocess" or "--" not in argv:
+        return list(argv), None
+    cut = argv.index("--")
+    return list(argv[:cut]), list(argv[cut + 1:])
+
+
 def main(argv: list | None = None) -> int:
     _force_utf8()
+    raw, tail = _split_command(list(sys.argv[1:] if argv is None else argv))
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(raw)
     if args.verb == "record":
         return _cmd_record(args, parser)
+    if args.verb == "record-subprocess":
+        args.command = list(tail) if tail is not None else []
+        return _cmd_record_subprocess(args)
     if args.verb == "replay":
         return _cmd_replay(args, parser)
     if args.verb == "diff":
@@ -207,6 +255,34 @@ def _record_batch(args, command: list) -> int:
     if note:
         print(note)
     print("下一步：agenttest stat " + str(path) + ' --assert "success>=0.8"')
+    return EXIT_OK
+
+
+def _cmd_record_subprocess(args) -> int:
+    """跑一个真实 CLI agent 并录下来：只记观测到的，缺的写进 meta.unobserved。"""
+    command = list(args.command)
+    if command and command[0] == "--":
+        command = command[1:]
+    if not command:
+        print(
+            "ERROR record-subprocess 需要一个命令："
+            "agenttest record-subprocess <dir> -- <command>",
+            file=sys.stderr,
+        )
+        return EXIT_FAIL
+    try:
+        outcome = adapters.record_subprocess(
+            command,
+            args.target,
+            cwd=args.cwd,
+            timeout=args.timeout,
+            stream_limit=args.stream_limit,
+            watch=args.watch,
+        )
+    except (adapters.AdapterError, CassetteError, OSError) as exc:
+        print("ERROR " + str(exc), file=sys.stderr)
+        return EXIT_FAIL
+    print(adapters.summarize(outcome))
     return EXIT_OK
 
 
