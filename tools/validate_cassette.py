@@ -69,6 +69,21 @@ RULES = (
 )
 
 
+def _force_utf8() -> None:
+    """把 stdout / stderr 钉成 UTF-8（与 src/agenttest/cli.py 的 _force_utf8 一致）。
+
+    不加这一段，被 subprocess 捕获的输出会按系统代码页编码（Windows 上是 cp936），
+    父进程若用 utf-8 解码就是乱码，于是"第 6 行"这样的断言永远不成立。
+    Linux CI 看不出来，Windows 上一 clone 就红——所以校验器必须自己钉死编码。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            # stdout 被替换成非文本流（测试里的 StringIO 等）时就跳过。
+            pass
+
+
 class Finding:
     __slots__ = ("ok", "rule", "message")
 
@@ -289,6 +304,7 @@ def report(targets) -> int:
 
 
 def main(argv=None) -> int:
+    _force_utf8()
     parser = argparse.ArgumentParser(
         prog="validate_cassette.py",
         description="校验 agenttest cassette（JSONL + sha256 哈希链），只依赖标准库。",

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -59,12 +60,22 @@ def workdir():
 
 
 def run_tool(*args: str) -> subprocess.CompletedProcess:
+    """跑校验器。
+
+    两处都显式钉死 UTF-8，不依赖运行环境的代码页：
+    * 子进程侧由 tools/validate_cassette.py 的 _force_utf8() 负责；
+    * 父进程侧在这里写死 encoding，并主动从环境里摘掉 PYTHONIOENCODING，
+      这样测试既不靠 locale，也不靠谁在外面 export 了变量。
+    """
+    env = os.environ.copy()
+    env.pop("PYTHONIOENCODING", None)
     return subprocess.run(
         [sys.executable, str(TOOL), *args],
         capture_output=True,
         text=True,
         encoding="utf-8",
         errors="replace",
+        env=env,
     )
 
 
@@ -160,6 +171,25 @@ def test_spec_hash_example_is_self_consistent():
 
 
 # --- 校验器的行为 -----------------------------------------------------------
+
+
+def test_tool_output_is_pure_utf8(workdir):
+    """回归：不设 PYTHONIOENCODING 时，校验器的中文输出也必须是干净 UTF-8。
+
+    这就是 Windows 上会红的那条：子进程按系统代码页（cp936）编码、父进程按 utf-8
+    解码，于是"第 N 行"永远匹配不上。run_tool 已经摘掉 PYTHONIOENCODING，所以
+    这条测试在 Linux CI 与 Windows 上都验的是同一件事。
+    """
+    records = records_of(GOOD)
+    records[5]["event"]["text"] = "tampered"
+    lines = GOOD.read_text(encoding="utf-8").splitlines()
+    lines[5] = json.dumps(records[5], ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    path = write_sample(workdir, "\n".join(lines) + "\n")
+
+    result = run_tool(str(path))
+    assert "\ufffd" not in result.stdout
+    assert "第 6 行" in result.stdout
+    assert "S5" in result.stdout
 
 
 def test_example_cassettes_pass():
