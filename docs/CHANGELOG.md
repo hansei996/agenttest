@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## Unreleased (v0.3)
+- **录制真实 CLI agent**：`agenttest record-subprocess <dir> -- <cmd>`，两种事件来源（agent 自输出 JSONL / 进程层观测）。观测不到的事件写进 `meta.unobserved`，**不伪造**；agent 自报的 run.start/run.end 一律丢弃，`argv`/退出码只认观测值
+- **文件改动**：前后 sha256 快照（不依赖 git），增/改/删都记；>5000 文件记 `meta.snapshot_capped` 而非静默截断
+- **argparse 陷阱**：`record-subprocess` 在第一个 `--` 处切分，选项放在位置参数前后都能用（`record` 的解析路径未动）
+
 ## v0.2.0
 - **打包**：新增 `pyproject.toml` 与 `agenttest` 入口，安装后不再需要 `PYTHONPATH=src`
 - **统计断言**：`record --repeat N` 产出 `batch.jsonl`；`stat` 子命令判定 `success>=X` / `tokens<=Y` / `duration<=Z`，小样本（N<5）强制警告
