@@ -77,7 +77,7 @@ v0.1 补了 `src/agenttest/importers/`（用法见 docs/IMPORTERS.md），三条
    `synthetic_timestamps` / `warnings`）。这是 additive：`events.validate`
    只校验必填字段，`diff` 只比较工具调用与模型输出，既有语义不变。加它的理由是
    "合成时间戳"和"读不懂的内容"必须留在 cassette 里可核验，而不是只在内存里返回一次。
-2. **导入的 cassette 不可 replay**：`run.start.argv` 是 `[]`，`cwd` 是 `.`， 
+2. **导入的 cassette 不可 replay**：`run.start.argv` 是 `[]`，`cwd` 是 `.`，
    `env_fingerprint` 是 `imported|<格式>`。日志里没有 agent 可跑，所以不假装它
    能重放；导入的 cassette 用来读、diff、跑断言，要 replay 得把 argv 指向自己的 agent。
 3. **时间戳策略是 DESIGN 没定义的**：只要有一轮缺时间戳，就把**全部** `t` 按事件
