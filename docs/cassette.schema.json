@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/hansei996/agenttest/blob/main/docs/cassette.schema.json",
+  "title": "agenttest cassette (schema_version 0.1.0)",
+  "description": "磁盘上的 cassette 是 JSONL：一行一条记录。把文件按行拆开得到数组后，用本 schema 顶层校验；单条记录用 $defs.record。JSON Schema 表达不了哈希链（hash = sha256(canonical({seq,prev,event}))），那一层由 tools/validate_cassette.py 的 S4/S5 负责。规范全文见 docs/CASSETTE-SPEC.md。",
+  "type": "array",
+  "minItems": 2,
+  "items": {
+    "$ref": "#/$defs/record"
+  },
+  "$defs": {
+    "record": {
+      "type": "object",
+      "description": "一行 = 一条记录。hash 覆盖 seq/prev/event，不含 hash 自己。",
+      "required": [
+        "seq",
+        "prev",
+        "event",
+        "hash"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "seq": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "从 0 起逐条 +1"
+        },
+        "prev": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "上一条记录的 hash；第一条是 null"
+        },
+        "event": {
+          "$ref": "#/$defs/event"
+        },
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "sha256(canonical({seq,prev,event})) 的小写十六进制"
+        }
+      }
+    },
+    "event": {
+      "description": "6 类事件之一。类型白名单是封闭的：未知 type 非法，不是被忽略。",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/run.start"
+        },
+        {
+          "$ref": "#/$defs/model.call"
+        },
+        {
+          "$ref": "#/$defs/model.result"
+        },
+        {
+          "$ref": "#/$defs/tool.call"
+        },
+        {
+          "$ref": "#/$defs/tool.result"
+        },
+        {
+          "$ref": "#/$defs/run.end"
+        }
+      ]
+    },
+    "t": {
+      "type": "number",
+      "minimum": 0,
+      "description": "相对本次运行起点的秒数。参与哈希，但不参与行为比较。"
+    },
+    "run.start": {
+      "type": "object",
+      "required": [
+        "type",
+        "agent",
+        "argv",
+        "cwd",
+        "env_fingerprint"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "const": "run.start"
+        },
+        "t": {
+          "$ref": "#/$defs/t"
+        },
+        "agent": {
+          "type": "string"
+        },
+        "argv": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "可重放的命令行；导入的 cassette 是 []"
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "env_fingerprint": {
+          "type": "string"
+        },
+        "workdir": {
+          "type": "string",
+          "description": "产物比对的起点，相对 cwd"
+        },
+        "meta": {
+          "type": "object",
+          "description": "只有导入器会写：format / source / synthetic_timestamps / warnings",
+          "additionalProperties": true,
+          "properties": {
+            "format": {
+              "type": "string"
+            },
+            "source": {
+              "type": "string"
+            },
+            "synthetic_timestamps": {
+              "type": "boolean"
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "schema_version": {
+          "type": "string",
+          "const": "0.1.0",
+          "description": "缺省视为 0.1.0；本版本没有实现写它"
+        }
+      }
+    },
+    "model.call": {
+      "type": "object",
+      "required": [
+        "type",
+        "model",
+        "request"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "const": "model.call"
+        },
+        "t": {
+          "$ref": "#/$defs/t"
+        },
+        "model": {
+          "type": "string"
+        },
+        "request": {
+          "type": "object",
+          "required": [
+            "messages",
+            "tools"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "messages": {
+              "type": "array"
+            },
+            "tools": {
+              "type": "array"
+            }
+          }
+        }
+      }
+    },
+    "model.result": {
+      "type": "object",
+      "required": [
+        "type",
+        "text",
+        "tool_calls",
+        "usage"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "const": "model.result"
+        },
+        "t": {
+          "$ref": "#/$defs/t"
+        },
+        "text": {
+          "type": "string"
+        },
+        "tool_calls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "args"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "args": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "usage": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "原样保留，通常是 {in, out}"
+        }
+      }
+    },
+    "tool.call": {
+      "type": "object",
+      "required": [
+        "type",
+        "name",
+        "args"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "const": "tool.call"
+        },
+        "t": {
+          "$ref": "#/$defs/t"
+        },
+        "name": {
+          "type": "string"
+        },
+        "args": {
+          "type": "object"
+        }
+      }
+    },
+    "tool.result": {
+      "type": "object",
+      "required": [
+        "type",
+        "name",
+        "ok",
+        "bytes"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "const": "tool.result"
+        },
+        "t": {
+          "$ref": "#/$defs/t"
+        },
+        "name": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "输出 UTF-8 字节数"
+        }
+      }
+    },
+    "run.end": {
+      "type": "object",
+      "required": [
+        "type",
+        "exit_code",
+        "files_changed"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "const": "run.end"
+        },
+        "t": {
+          "$ref": "#/$defs/t"
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "files_changed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "files": {
+          "type": "object",
+          "description": "路径 -> 产物 sha256（文件不存在则是 null）",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
