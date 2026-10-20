@@ -163,7 +163,9 @@ def edit_file(workdir):
         text = path.read_text(encoding="utf-8")
         if args["find"] not in text:
             raise ValueError(args["path"] + " 里找不到 " + repr(args["find"]))
-        path.write_text(text.replace(args["find"], args["replace"], 1), encoding="utf-8")
+        updated = text.replace(args["find"], args["replace"], 1)
+        # 必须写字节：write_text 在 Windows 上会把 \n 变成 \r\n，产物哈希就跨不了机器
+        path.write_bytes(updated.encode("utf-8"))
         return "已修改 " + args["path"] + ": " + args["find"] + " -> " + args["replace"]
 
     return handler
