@@ -1,11 +1,20 @@
-"""agenttest —— 把 agent 的行为当代码来测（v0.2）。
+"""agenttest —— 把 agent 的行为当代码来测（v0.3）。
 
-对外只有四件事：record / replay / diff / stat，见 docs/DESIGN.md。
+对外动词：record / record-subprocess / replay / diff / stat / regress / import，见 docs/。
 运行时零第三方依赖（纯标准库）。
 """
 
 __version__ = "0.2.0"
 
-from . import assertions, cassette, diff, events, guard, stat  # noqa: F401
+from . import assertions, cassette, diff, events, guard, regress, stat  # noqa: F401
 
-__all__ = ["__version__", "assertions", "cassette", "diff", "events", "guard", "stat"]
+__all__ = [
+    "__version__",
+    "assertions",
+    "cassette",
+    "diff",
+    "events",
+    "guard",
+    "regress",
+    "stat",
+]

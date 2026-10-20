@@ -8,6 +8,7 @@ from pathlib import Path
 
 from . import adapters
 from . import assertions as asrt
+from . import regress as rg
 from . import stat as st
 from .cassette import CassetteError, cassette_path, read_cassette
 from .diff import diff_runs
@@ -118,6 +119,41 @@ def build_parser() -> argparse.ArgumentParser:
         help="比例断言只按点估计判定（非统计显著；默认要求 95%% 置信区间也过线）",
     )
 
+    reg = subs.add_parser("regress", help="多次运行的回归看板：汇总断言 + 与基线比对")
+    reg.add_argument("path", help="装着多份 cassette 的目录，或单个 cassette.jsonl")
+    reg.add_argument(
+        "--assert",
+        dest="asserts",
+        action="append",
+        default=[],
+        metavar="EXPR",
+        help="断言，可重复：before:quote_error / touched:src/auth.py / exit:0 ...",
+    )
+    reg.add_argument(
+        "--baseline",
+        default=None,
+        metavar="REPORT.json",
+        help="上一份 report.json：给了就做基线比对（新增失败 / 修好 / 通过率 / 成本）",
+    )
+    reg.add_argument(
+        "--out",
+        default=None,
+        metavar="DIR|FILE",
+        help="报告写到哪里：目录则写 <DIR>/report.json，以 .json 结尾则写那个文件",
+    )
+    reg.add_argument(
+        "--html",
+        action="store_true",
+        help="额外生成单文件 index.html（零外部依赖、无 CDN，可离线打开）",
+    )
+    reg.add_argument(
+        "--fail-on",
+        dest="fail_on",
+        default="newly_failing",
+        choices=rg.FAIL_ON_CHOICES,
+        help="退出码策略（默认 %(default)s）：newly_failing / any / never",
+    )
+
     imp = subs.add_parser("import", help="把已有的模型日志导入成 cassette")
     imp.add_argument("source", help="日志文件（.jsonl 或 .json）")
     imp.add_argument("outdir", help="输出目录，写成 <outdir>/cassette.jsonl")
@@ -167,6 +203,8 @@ def main(argv: list | None = None) -> int:
         return _cmd_diff(args)
     if args.verb == "stat":
         return _cmd_stat(args)
+    if args.verb == "regress":
+        return _cmd_regress(args)
     if args.verb == "import":
         return _cmd_import(args)
     parser.error("未知子命令：" + str(args.verb))
@@ -367,6 +405,34 @@ def _cmd_stat(args) -> int:
     failed = sum(1 for result in results if not result.ok)
     print("FAILED " + label + " (" + str(failed) + "/" + str(len(results)) + " 条统计断言失败)")
     return EXIT_FAIL
+
+
+def _cmd_regress(args) -> int:
+    try:
+        report = rg.regress(
+            args.path,
+            asserts=args.asserts,
+            baseline=args.baseline,
+            out=args.out,
+            html=args.html,
+        )
+    except (rg.RegressError, CassetteError) as exc:
+        print("ERROR " + str(exc), file=sys.stderr)
+        return EXIT_FAIL
+    print(rg.render_table(report))
+    for kind, location in report.written.items():
+        print("  报告        " + kind + " -> " + location)
+    code = rg.resolve_exit_code(report, args.fail_on)
+    if report.errored:
+        reason = "有 cassette 读不了"
+    elif report.comparison and report.comparison.newly_failing:
+        reason = "新增失败 " + str(len(report.comparison.newly_failing)) + " 条"
+    elif report.passed_runs == 0:
+        reason = "所有 run 都失败"
+    else:
+        reason = "没有退步"
+    print("门禁 fail-on=" + args.fail_on + " → exit " + str(code) + "（" + reason + "）")
+    return code
 
 
 if __name__ == "__main__":
