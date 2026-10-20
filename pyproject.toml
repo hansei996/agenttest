@@ -18,6 +18,9 @@ classifiers = [
 [project.scripts]
 agenttest = "agenttest.cli:main"
 
+[project.entry-points.pytest11]
+agenttest = "agenttest.pytest_plugin"
+
 [tool.setuptools]
 package-dir = { "" = "src" }
 
