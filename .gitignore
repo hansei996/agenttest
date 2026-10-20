@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# local scratch
+_batchcheck/
+_b5/
+_impcheck/
+.work/
