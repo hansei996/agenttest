@@ -14,9 +14,12 @@
 - [x] 可安装：`pip install` 后直接 `agenttest` 命令（去掉 PYTHONPATH）
 - [x] 统计断言：`record --repeat N` + `stat`，成功率 / 成本 / 耗时；N<5 时必须警告
 - [x] 日志导入器：OpenAI / Anthropic 现有日志 → cassette
-- [ ] `agenttest import` 子命令接线（lead 负责）
-- [ ] ROADMAP / CHANGELOG 落盘
-验收数字：装好后三条命令（record / replay / stat）在一台干净机器上可跑通，CI 绿。
+- [x] `agenttest import` 子命令接线
+- [x] ROADMAP / CHANGELOG 落盘
+- [x] pytest 插件（`cassette` fixture + 断言助手）
+- [x] cassette 规范 + 独立第三方实现 + 校验器（v1.0 提前完成一半）
+- [x] UTF-8 BOM 容忍与「人话」编码报错（Windows 用户最容易踩的坑）
+验收数字：装好后三条命令（record / replay / stat）可跑通，CI 绿（153 passed，run 39463000146）。**v0.2.0 已发布。**
 
 ## v0.3 — 能接真东西
 - 适配器：任意 CLI agent（子进程）+ 一个 HTTP agent 框架（择一）
