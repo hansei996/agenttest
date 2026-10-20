@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
 import sysconfig
 import tomllib
 from pathlib import Path
+
+import agenttest
 
 
 def load_pyproject(repo):
@@ -39,7 +42,10 @@ def test_metadata_is_installable_and_dependency_free(repo):
     data = load_pyproject(repo)
     project = data["project"]
     assert project["name"] == "agenttest"
-    assert project["version"] == "0.1.0"
+    # 版本号只校验"合法 + 两处一致"，不钉死具体数字：
+    # 钉死会让每次发版都把测试弄红，而真正该防的是 pyproject 与包内 __version__ 漂移。
+    assert re.fullmatch(r"\d+\.\d+\.\d+", project["version"])
+    assert project["version"] == agenttest.__version__
     assert project["dependencies"] == []
     assert project["scripts"] == {"agenttest": "agenttest.cli:main"}
     assert data["build-system"]["build-backend"] == "setuptools.build_meta"
