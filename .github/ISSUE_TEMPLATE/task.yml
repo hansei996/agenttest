@@ -1,0 +1,61 @@
+name: 任务卡
+description: 一件要人（或 agent）去做的事，带验收标准
+title: "[task] "
+labels: ["task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        五要素缺一不接单：**目标 / 边界 / 约束 / 验收标准 / 要交的证据**。
+  - type: textarea
+    id: goal
+    attributes:
+      label: 目标
+      description: 一句话说清做完之后世界有什么不同
+      placeholder: 让 agenttest 能识别时红时绿的不稳定断言
+    validations:
+      required: true
+  - type: textarea
+    id: boundary
+    attributes:
+      label: 边界
+      description: 只允许动哪些文件/目录；明确不许碰的东西
+      placeholder: |
+        只写 src/agenttest/flaky.py、tests/test_flaky.py、docs/FLAKY.md
+        不许改 cassette / replay / assertions 的既有语义
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: 约束
+      description: 硬性要求（依赖、性能、兼容、诚实性）
+      placeholder: |
+        运行时零第三方依赖
+        置信区间必须复用 stat.wilson_interval，不许另写一份
+        样本不足时必须说明样本不足，不许给精确结论
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收标准
+      description: 可机器或人工判定的条件，写成清单
+      placeholder: |
+        - [ ] 5/5 全过 → NO_FLAKINESS_OBSERVED
+        - [ ] 3/5 → FLAKY 且区间与 stat 一致
+        - [ ] n<5 → UNRELIABLE
+        - [ ] pytest 全绿，CI 绿
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 需要交的证据
+      description: 交付时必须贴出来的东西（真实终端输出 / commit sha / CI run id），自述不算
+      placeholder: |
+        - commit sha
+        - flaky 两种结果的真实终端输出
+        - pytest 计数与 CI run id
+    validations:
+      required: true
