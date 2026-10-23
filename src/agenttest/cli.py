@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 from . import adapters
 from . import assertions as asrt
+from . import flaky as fk
 from . import regress as rg
 from . import stat as st
 from .cassette import CassetteError, cassette_path, read_cassette
@@ -154,6 +156,45 @@ def build_parser() -> argparse.ArgumentParser:
         help="退出码策略（默认 %(default)s）：newly_failing / any / never",
     )
 
+    flk = subs.add_parser(
+        "flaky", help="多次运行的抖动识别：这条断言到底稳不稳，够不够格判断退步"
+    )
+    flk.add_argument(
+        "paths",
+        nargs="+",
+        metavar="runs",
+        help="一个或多个 cassette 目录（<dir>/cassette.jsonl 或 <dir>/<run>/cassette.jsonl）",
+    )
+    flk.add_argument(
+        "--assert",
+        dest="asserts",
+        action="append",
+        default=[],
+        metavar="EXPR",
+        help="断言，可重复：before:quote_error / touched:src/auth.py / exit:0 ...",
+    )
+    flk.add_argument(
+        "--min-runs",
+        dest="min_runs",
+        type=int,
+        default=fk.MIN_RUNS,
+        metavar="N",
+        help="少于这个运行数就整表标 UNRELIABLE、不给判定（默认 %(default)s）",
+    )
+    flk.add_argument(
+        "--out",
+        default=None,
+        metavar="REPORT.json",
+        help="把判定结果写成 JSON（schema_version / generated_at / 每条断言的 runs·passed·pass_rate·low·high·verdict）",
+    )
+    flk.add_argument(
+        "--fail-on",
+        dest="fail_on",
+        default="never",
+        choices=["never", "flaky"],
+        help="退出码策略（默认 %(default)s，只报告不拦人）",
+    )
+
     subs.add_parser("demo", help="一条命令自证：record → replay PASS/FAIL → diff → 回归报告")
     imp = subs.add_parser("import", help="把已有的模型日志导入成 cassette")
     imp.add_argument("source", help="日志文件（.jsonl 或 .json）")
@@ -206,6 +247,8 @@ def main(argv: list | None = None) -> int:
         return _cmd_stat(args)
     if args.verb == "regress":
         return _cmd_regress(args)
+    if args.verb == "flaky":
+        return _cmd_flaky(args)
     if args.verb == "demo":
         from .demo import run_demo
 
@@ -472,4 +515,32 @@ def _cmd_import(args) -> int:
         "注意 导入的 cassette 不能 replay（日志里没有可重跑的 agent），"
         "但可以 diff、跑断言、归档。"
     )
+
+
+def _cmd_flaky(args) -> int:
+    try:
+        report = fk.collect(args.paths, args.asserts, min_runs=args.min_runs)
+    except (fk.FlakyError, rg.RegressError, CassetteError) as exc:
+        print("ERROR " + str(exc), file=sys.stderr)
+        return EXIT_FAIL
+    print(fk.render_table(report))
+    if args.out:
+        path = Path(args.out)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            payload = json.dumps(report.to_dict(), ensure_ascii=False, indent=2, sort_keys=True)
+            path.write_bytes((payload + "\n").encode("utf-8"))
+        except OSError as exc:
+            print("ERROR 写不出 --out 文件：" + str(exc), file=sys.stderr)
+            return EXIT_FAIL
+        print("  报告        json -> " + str(path))
+    code = fk.gate_exit_code(report, args.fail_on)
+    if args.fail_on == "never":
+        reason = "只报告，不拦人"
+    elif report.noisy:
+        reason = "观察到 " + str(len(report.noisy)) + " 条断言时过时不过"
+    else:
+        reason = "没有观察到抖动"
+    print("门禁 fail-on=" + args.fail_on + " → exit " + str(code) + "（" + reason + "）")
+    return code
     return 0
