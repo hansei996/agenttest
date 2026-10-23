@@ -515,6 +515,7 @@ def _cmd_import(args) -> int:
         "注意 导入的 cassette 不能 replay（日志里没有可重跑的 agent），"
         "但可以 diff、跑断言、归档。"
     )
+    return EXIT_OK
 
 
 def _cmd_flaky(args) -> int:
@@ -543,4 +544,3 @@ def _cmd_flaky(args) -> int:
         reason = "没有观察到抖动"
     print("门禁 fail-on=" + args.fail_on + " → exit " + str(code) + "（" + reason + "）")
     return code
-    return 0
