@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agenttest"
-version = "0.3.0"
+version = "0.4.0"
 description = "把 agent 的行为当代码来测：record / replay / diff"
 readme = "README.md"
 requires-python = ">=3.10"

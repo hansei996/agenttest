@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## v0.4.0
+
+- **不稳定断言识别**：`agenttest flaky <runs...> --assert EXPR` 对同一断言在多次运行里的表现做判定，值改为描述证据的名字：`PASSED_IN_ALL_RUNS` / `FAILED_IN_ALL_RUNS` / `MIXED_OBSERVED` / `INSUFFICIENT_RUNS`（旧名只留 alias 与 `legacy` 字段，终端与 HTML 不再出现）
+- **表尾固定一行**：`本表 n=5；5 次全过只排除失败率 > 43%，要到 ≤1% 需 381 次`——把「样本量撑得起多强的结论」永远摆在读者面前
+- **`--out report.json`**：机器可读，含 schema_version / generated_at / 每条断言原文 / runs / passed / pass_rate / low / high / verdict / legacy
+- **`--fail-on never|flaky`**（默认 never）：想让 CI 因不稳定而红时显式打开
+- **两个判定 bug 修复**：分子曾写死成 runs（0/5 全败印成「5/5 全败」）；FAIL 分支曾用 bound(0.99) 比上界，应为 1-bound(0.01)
+- **CI 覆盖 Windows**：ubuntu + windows 双 job，含 console-script 硬断言与 CRLF 断言
+
 ## v0.3.0
 - **录制真实 CLI agent**：`agenttest record-subprocess <dir> -- <cmd>`，两种事件来源（agent 自输出 JSONL / 进程层观测）。观测不到的事件写进 `meta.unobserved`，**不伪造**；agent 自报的 run.start/run.end 一律丢弃，`argv`/退出码只认观测值
 - **文件改动**：前后 sha256 快照（不依赖 git），增/改/删都记；>5000 文件记 `meta.snapshot_capped` 而非静默截断

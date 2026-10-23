@@ -4,7 +4,7 @@
 运行时零第三方依赖（纯标准库）。
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 from . import assertions, cassette, diff, events, guard, regress, stat  # noqa: F401
 
