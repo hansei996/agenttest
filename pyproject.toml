@@ -18,6 +18,12 @@ classifiers = [
 [project.scripts]
 agenttest = "agenttest.cli:main"
 
+[project.urls]
+Homepage = "https://github.com/hansei996/agenttest"
+Issues = "https://github.com/hansei996/agenttest/issues"
+Changelog = "https://github.com/hansei996/agenttest/blob/main/docs/CHANGELOG.md"
+Documentation = "https://github.com/hansei996/agenttest/tree/main/docs"
+
 [project.entry-points.pytest11]
 agenttest = "agenttest.pytest_plugin"
 

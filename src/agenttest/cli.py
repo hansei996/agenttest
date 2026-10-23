@@ -154,6 +154,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="退出码策略（默认 %(default)s）：newly_failing / any / never",
     )
 
+    subs.add_parser("demo", help="一条命令自证：record → replay PASS/FAIL → diff → 回归报告")
     imp = subs.add_parser("import", help="把已有的模型日志导入成 cassette")
     imp.add_argument("source", help="日志文件（.jsonl 或 .json）")
     imp.add_argument("outdir", help="输出目录，写成 <outdir>/cassette.jsonl")
@@ -205,6 +206,10 @@ def main(argv: list | None = None) -> int:
         return _cmd_stat(args)
     if args.verb == "regress":
         return _cmd_regress(args)
+    if args.verb == "demo":
+        from .demo import run_demo
+
+        return run_demo()
     if args.verb == "import":
         return _cmd_import(args)
     parser.error("未知子命令：" + str(args.verb))

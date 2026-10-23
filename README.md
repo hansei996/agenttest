@@ -1,22 +1,27 @@
 # agenttest
 
-> **把 agent 的行为当代码来测。**
+> **让 agent 的行为可以被断言。**
 
-record 一次真实运行 → replay 到确定状态 → 断言它的行为 → 改了 prompt / 换了模型 / 升级工具后，看哪些行为悄悄变了。
+`agenttest demo` 一条命令自证（10 秒、不联网、不需要 API key）：
 
-```bash
-pip install -e .   # 零运行时依赖，装完就有 agenttest 命令
-agenttest record ./runs/fix-auth -- python -m my_agent "修复 src/auth.py 的崩溃"
-agenttest replay ./runs/fix-auth --assert touched:src/auth.py --assert before:quote_error
-agenttest diff   ./runs/before ./runs/after      # 两份 cassette 的行为差异
+```text
+agenttest demo — 让 agent 的行为可以被断言
+
+  PASS  replay examples/good   守规矩：先引用报错再改代码
+  FAIL  replay examples/bad    偷懒：第 4 个事件就 edit_file，全程没引用报错
+  行为差异   新增 调用 edit_file(src/auth.py) · 缺失 引用 quote_error
+  回归报告   /tmp/agenttest-demo-xxxx/index.html（单文件、零依赖、离线可开）
+
+  同一个 agent，一次守规矩一次偷懒 —— 工具抓得出区别。
+  下一步：agenttest replay <你的 cassette> --assert before:quote_error
 ```
 
-离线装不上时（`pip install -e .` 的 build isolation 要联网拉 setuptools，`--no-build-isolation` 在没有 setuptools 的解释器上会报 BackendUnavailable）：
-直接 `PYTHONPATH=src python -m agenttest ...` 从源码跑，或先在有网时装好 setuptools 再安装。
+```bash
+pip install -e . && agenttest demo
+```
 
-离线环境装不上（`pip install -e .` 的 build isolation 需要联网拉 setuptools，
-而 `--no-build-isolation` 在没有 setuptools 的解释器上会报 BackendUnavailable）：
-直接用 `PYTHONPATH=src python -m agenttest ...` 从源码跑，或者先在有网时装好 setuptools 再安装。
+离线装不上时（build isolation 要联网拉 setuptools，`--no-build-isolation` 在缺 setuptools 的解释器上会报 BackendUnavailable）：
+直接 `PYTHONPATH=src python -m agenttest demo` 从源码跑。
 
 ## 为什么需要它
 
