@@ -24,6 +24,20 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 
 
+def _force_utf8():
+    """钉成 UTF-8：CI 日志与父进程都按 utf-8 解码，cp936 会变成乱码。
+
+    与 tools/validate_cassette.py / tools/cassette_view.py 的 _force_utf8 同一个理由。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
 def run(*args):
     proc = subprocess.run(
         [sys.executable, "-m", "agenttest", *args],
@@ -114,4 +128,5 @@ def main():
 
 
 if __name__ == "__main__":
+    _force_utf8()
     sys.exit(main())
