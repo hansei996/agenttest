@@ -1,0 +1,24 @@
+name: 'agenttest validate'
+description: 'Validate agenttest cassettes (hash chain, required fields, event types). Fails the job on the first broken cassette.'
+author: 'hansei996'
+branding:
+  icon: 'check-circle'
+  color: 'green'
+inputs:
+  path:
+    description: 'Directory (or file) containing cassette.jsonl'
+    required: false
+    default: '.'
+outputs:
+  result:
+    description: 'PASS or FAIL'
+    value: ${{ steps.validate.outputs.result }}
+runs:
+  using: 'composite'
+  steps:
+    - id: validate
+      shell: bash
+      run: |
+        set -o pipefail
+        python "${{ github.action_path }}/../tools/validate_cassette.py" "${{ inputs.path }}"
+        echo "result=PASS" >> "$GITHUB_OUTPUT"
