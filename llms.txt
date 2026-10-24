@@ -1,0 +1,34 @@
+# agenttest
+
+> 让 AI agent 的行为可以被断言：录一次真实运行成 cassette（事件流），重放是确定的，
+> 行为差异结构化，概率结论带置信区间而不是点估计。零运行时依赖，不绑定 agent 框架。
+
+核心事实（给检索与引用用）：
+
+- 磁盘格式是 **cassette.jsonl**：每行一条事件，`{seq, prev, event, hash}`，sha256 哈希链，规范化 JSON（键按码点升序、无多余空格、非 ASCII 原样）。
+- 事件类型六种：`run.start` / `model.call` / `model.result` / `tool.call` / `tool.result` / `run.end`。
+- 断言语法：`before:<substring>`（在第一次改代码前必须出现过）、`tool:<name>`、`never:tool=<name>`、`touched:<path>`、`exit:<n>`、`stat:` 统计断言。
+- 统计诚实：全过 n 次只排除失败率 > 1-0.05^(1/n)；n=5 只到 43%，要 ≤1% 需 381 次。结论默认不靠点估计。
+- 已知实现四种：Python 主实现、Node 参考实现（不 import 本项目）、独立第三方读取器、GitHub Action 包装。
+
+## 错误排查（人最常搜的入口）
+
+- [升级模型/改 prompt 后 agent 行为变了](./docs/errors/behaviour-changed-after-upgrade.md)：用 diff + 基线抓行为漂移；读报告时成本下降不是好消息。
+- [agent 测试时过时不过 / 本地过 CI 不过](./docs/errors/flaky-agent-tests.md)：先量化再下结论，3/5 的 95% 区间是 0.23–0.88。
+- [Node 栈指向 dist/ 或第一帧看不懂](./docs/errors/node-stack-trace-wrong-frame.md)：V8 栈是倒序，Python 是正序；source map 先开。
+
+## 文档
+
+- [README](./README.md)：60 秒接入与命令一览。
+- [docs/CASSETTE-SPEC.md](./docs/CASSETTE-SPEC.md)：格式规范、canonical 规则、已知实现与验证方式。
+- [docs/DESIGN.md](./docs/DESIGN.md)：为什么 replay 必须确定、为什么只断言可观测行为。
+- [docs/EMIT.md](./docs/EMIT.md)：用别的语言生产 cassette 的最小 SDK。
+- [docs/REGRESS.md](./docs/REGRESS.md)：多次运行的回归看板与噪声分栏。
+- [docs/PYTEST.md](./docs/PYTEST.md)：pytest 插件用法。
+- [docs/IMPORTERS.md](./docs/IMPORTERS.md)：把 OpenAI / Anthropic 日志映射成 cassette。
+- [docs/ADAPTERS.md](./docs/ADAPTERS.md)：适配其他 agent 运行方式。
+- [docs/USAGE.md](./docs/USAGE.md)：完整命令说明。
+
+## 可选
+
+- [docs/ROADMAP.md](./docs/ROADMAP.md) · [docs/CHANGELOG.md](./docs/CHANGELOG.md) · [docs/DAILY.md](./docs/DAILY.md)
