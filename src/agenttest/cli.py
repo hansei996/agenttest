@@ -195,6 +195,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="退出码策略（默认 %(default)s，只报告不拦人）",
     )
 
+    exp = subs.add_parser("export", help="把 regress 报告导出成 JUnit / SARIF")
+    exp.add_argument("report", help="regress 生成的 report.json")
+    exp.add_argument("--format", dest="fmt", required=True, choices=["junit", "sarif"], help="导出格式")
+    exp.add_argument("--out", dest="out", default=None, help="写入文件；不给就打到 stdout")
     subs.add_parser("demo", help="一条命令自证：record → replay PASS/FAIL → diff → 回归报告")
     imp = subs.add_parser("import", help="把已有的模型日志导入成 cassette")
     imp.add_argument("source", help="日志文件（.jsonl 或 .json）")
@@ -249,6 +253,10 @@ def main(argv: list | None = None) -> int:
         return _cmd_regress(args)
     if args.verb == "flaky":
         return _cmd_flaky(args)
+    if args.verb == "export":
+        from .export import export as _export
+
+        return _cmd_export(args, _export)
     if args.verb == "demo":
         from .demo import run_demo
 
@@ -544,3 +552,17 @@ def _cmd_flaky(args) -> int:
         reason = "没有观察到抖动"
     print("门禁 fail-on=" + args.fail_on + " → exit " + str(code) + "（" + reason + "）")
     return code
+
+def _cmd_export(args, export_fn) -> int:
+    from .export import ExportError
+
+    try:
+        text = export_fn(args.report, args.fmt, args.out)
+    except ExportError as exc:
+        print("ERROR 导出失败：" + str(exc))
+        return 1
+    if not args.out:
+        print(text, end="")
+    else:
+        print("导出      " + args.fmt + " -> " + str(args.out))
+    return 0
