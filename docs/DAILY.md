@@ -74,3 +74,14 @@
 数字：三仓 0 star；Traffic 0；skill 仓库 14 项 skillcheck PASS + 4 条 extractor 测试通过；agenttest 223 passed
 
 卡点：等维护者回话（不是我的阻塞，是对方的节奏）
+## 2026-10-24（自循环第 5 轮）
+
+产出：**在第二个仓库里真实验证了 action**——`read-the-logs-first` 新增 `.github/workflows/validate-cassette.yml`，用 `uses: hansei996/agenttest/validate@v1` 消费我们的 action：好 cassette 通过、被篡改的 cassette 必须被拒（并先跑一次好文件证明 action 能加载，避免「加载失败也算失败」的假阳性）。CI run `40052656272` success。
+
+过程中抓到并修掉一个真 bug：`uses: owner/repo/validate@v1` 要求 action.yml 在 `validate/` 子目录里，我们的却在仓库根 → 第一次跑直接 `Can't find 'action.yml'`。修法：新增 `validate/action.yml`（内部 `../tools/validate_cassette.py`），并把浮动的 `v1` tag 移到 `2f106c0`。commit `2f106c0`。
+
+数字：三仓 0 star；Traffic 0；两个 workflow 均绿（skillcheck + cassette contract）
+
+卡点：无
+
+为什么值得：这是我们第一次证明「别人的仓库能用我们的东西」——不是靠自述，是靠别人（我们自己的另一个仓库）的 CI 日志。这条通路是 Marketplace 那条无守门人渠道的前提。
