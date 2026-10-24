@@ -135,3 +135,14 @@ $ python tools/validate_cassette.py out/
 它不引入新算法——复用 `flaky.runs_needed` 与 `wilson_interval`，存在的理由是让那个数字**可被查**，而不是埋在某条备注里。加了 4 条测试（含「runs_needed 与 plan 必须一致」这条交叉校验）。
 
 数字：三仓 0 star；Traffic 0；232 passed
+## 2026-10-24（自循环第 10 轮）
+
+产出：HTML 报告首屏改成**一句话结论**（commit 见 git log，235 passed）。原来是 `<h1>agenttest regress</h1>` + 一行含绝对路径的 meta —— 截图的人要的是结论，不是工具名。现在：
+```
+<h1>2 次运行里 1 次没通过 before:quote_error</h1>
+```
+同时把根目录绝对路径从 meta 里去掉（`C:/Users/.../tmp.UY0J82fWV6` 这种噪声占了注意力最高的位置），基线比对块提到表格之前。加了 3 条测试：结论必须出现、全过时结论要说全过、绝对路径不许泄漏。
+
+过程：这轮手工改模板踩了两次语法错（多留一个 `return (`、结尾多一个 `)`），都是 `py_compile` 当场抓到的。手工 patch 源码 + 立刻编译，是这轮唯一没翻车的原因。
+
+数字：三仓 0 star；Traffic 0；235 passed
