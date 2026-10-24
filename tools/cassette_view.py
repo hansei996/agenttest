@@ -29,6 +29,20 @@ WINDOW = 500
 CASSETTE_NAME = "cassette.jsonl"
 
 
+def _force_utf8() -> None:
+    """把 stdout / stderr 钉成 UTF-8（与 tools/validate_cassette.py 一致）。
+
+    Windows 控制台默认 cp936，中文提示会变成乱码 —— 用户看到的和别人断言的都对不上。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            pass
+
 def canonical(obj) -> str:
     return json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
@@ -233,4 +247,5 @@ def main(argv) -> int:
 
 
 if __name__ == "__main__":
+    _force_utf8()
     sys.exit(main(sys.argv[1:]))

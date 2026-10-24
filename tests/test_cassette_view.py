@@ -66,3 +66,26 @@ def test_unobserved_list_is_surfaced(tmp_path):
         "测试",
     )
     assert "未观测事件：tool.call、tool.result" in html
+
+
+def test_output_is_utf8_even_when_the_console_is_not(tmp_path):
+    """Windows 控制台是 cp936：不钉 UTF-8 的话，父进程按 utf-8 解码就是乱码，
+    于是「第 6 行」这种断言永远不成立 —— 这正是 win 上一 clone 就红的那类 bug。
+    """
+    import os
+
+    tampered = tmp_path / "tampered"
+    tampered.mkdir()
+    lines = (REPO / "examples" / "good" / "cassette.jsonl").read_text(encoding="utf-8").splitlines()
+    record = json.loads(lines[5])
+    record["event"]["t"] = 99.0
+    lines[5] = json.dumps(record, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    (tampered / "cassette.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if k not in {"PYTHONIOENCODING", "PYTHONUTF8"}}
+    proc = subprocess.run(
+        [sys.executable, str(TOOL), str(tampered), "--out", str(tmp_path / "v.html")],
+        cwd=str(REPO), capture_output=True, env=env,
+    )
+    assert proc.returncode == 1
+    text = proc.stdout.decode("utf-8")
+    assert "哈希链在第" in text, text
