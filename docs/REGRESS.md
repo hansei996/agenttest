@@ -126,3 +126,58 @@ jobs:
 | `stat` | N 次运行的**成功率 / 成本**够不够（比例断言看置信区间） |
 | `regress` | 这次相对**上次**，谁退步了、谁修好了（按 run × 断言 比对） |
 | `diff` | 两份 cassette 的**行为差别**长什么样（工具序列、成本） |
+
+## 6. 已知不稳定的断言：`--flaky-report`（别让噪声冒充退步）
+
+看板有个相反的失败模式：**已知会抖的断言一旦失败，就被算成「退步」**。于是 CI 因为噪声变红，团队开始忽略红灯 —— 那比没有看板更糟。
+
+```bash
+# ① 先量化它抖到什么程度（这一步不能跳）
+agenttest flaky runs/base --assert before:quote_error --out flaky.json
+
+# ② 再让看板把它分栏，而不是当退步
+agenttest regress runs/new --assert before:quote_error \
+    --baseline baseline/report.json --flaky-report flaky.json --out report/
+```
+
+执行结果里会出现单独一栏：
+
+```
+基线比对（基线 1 次运行 → 现在）
+  新增失败    0 条
+  噪声失败    1 条（已知不稳定，不计入退步）
+    ~ run-1 / before:quote_error（第 4 个事件）
+  注意        本次失败全部来自已知不稳定断言（MIXED_OBSERVED），未阻止 CI —— 它们被分栏而不是被隐藏
+```
+
+**三条规则**（都写进了测试，不是口头约定）：
+
+| 规则 | 为什么 |
+|---|---|
+| 只有 `MIXED_OBSERVED` 算噪声 | `INSUFFICIENT_RUNS`（样本不够）**不是**免责理由；证据不足 ≠ 可以排除 |
+| 噪声被排除时必须打印那句提示 | 「已知不稳定」不能变成「悄悄忽略」 |
+| 不给 `--flaky-report` 时行为一字不变 | 这条功能是加法，不是改默认 |
+
+## 7. 人工复盘：从看板下钻到事件
+
+```bash
+agenttest regress runs/new --assert before:quote_error --out report/ --html --html-views
+#   报告 html      -> report/index.html
+#   报告 run_views -> report/runs
+```
+
+每个 run id 都会变成链接，点进去是那一份 cassette 的事件浏览页（哈希链重新算过、`meta.unobserved` 会显示）。
+
+**注意这是 opt-in**：不加 `--html-views` 时仍然只出一个 `index.html`，保持「单文件、零依赖、离线可开」的承诺。没有 `tools/` 的部署（只装了 wheel）会自动跳过下钻，看板照常出。
+
+## 8. 先问代价：`plan`
+
+```
+$ agenttest plan
+  目标下界   需要次数   可排除失败率
+  0.90       35         > 10%
+  0.99       381        > 1%
+```
+
+打算说「它很稳定」之前先跑这条：**想主张失败率 ≤10%，就得跑 35 次并全部通过。**
+没有这个样本量时，任何「它很稳定」都只是点估计。

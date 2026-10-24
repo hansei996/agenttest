@@ -49,6 +49,7 @@ AGENTTEST_CASSETTE=runs/latest pytest tests/test_agent_behaviour.py
 | `diff` | 两次运行的行为差异 | 换模型、改 prompt 前后 |
 | `regress` | 多次运行的回归看板（终端 + 单文件 HTML） | 攒了一批运行之后 |
 | `regress --flaky-report` | 已知不稳定断言分栏，不冒充退步 | 有噪声但不想关掉看板 |
+| `regress --html-views` | 看板里每个 run 下钻到事件浏览页 | 想人工复盘某一次 |
 | `flaky` | 量化「时过时不过」到什么程度 | 有人说「它就是不稳定」时 |
 | `plan` | 想主张失败率 ≤X%，最少要跑多少次 | 下结论之前 |
 | `stat` | 多次运行的统计断言（Wilson 区间） | 关心成功率 / 成本 |
