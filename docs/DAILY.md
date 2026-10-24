@@ -242,3 +242,19 @@ $ agenttest init && agenttest record-subprocess runs/latest -- python agent.py &
 ```
 
 耗时记录：init <1s、record-subprocess <1s、pytest 0.02s。**「5 分钟接入」这个目标现在是 1 秒级的，卡点不在时间而在指示错误** —— 这就是为什么必须假装陌生人走一遍，光看文档看不出来。
+## 2026-10-24（自循环第 14 轮 · dogfood）
+
+产出：`tools/dogfood.py` + 接进 ubuntu 与 windows 两个 CI job（commit 见 git log）。它用**真实命令**走一遍「不稳定断言 → 噪声分栏」的工作流，并断言四件事：
+```
+DOGFOOD OK
+  噪声条数      1
+  硬退步条数    0
+  终端提示      有
+  HTML 噪声节   有
+```
+
+为什么需要它：`flaky` 和 `regress --flaky-report` 之前只有单元测试各自为政，**没有一条命令证明它们连起来在真实仓库里是活的**。现在每次 push 两个平台各问一次。
+
+判据写死在脚本里：已知不稳定的断言**不许**出现在 `newly_failing`（否则 fail）、噪声栏**不许**为空（否则 fail）、终端必须有那句「被分栏而不是被隐藏」、HTML 必须有噪声那一节。这样「功能退化」会红，「功能被悄悄删掉」也会红。
+
+数字：三仓 0 star；Traffic 0；239 passed；dogfood 本机 exit 0
