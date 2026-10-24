@@ -762,7 +762,12 @@ def render_html(report: Report, views: dict | None = None) -> str:
         f"<title>{escape(headline)}</title>\n"
         f"<style>{_CSS}</style>\n</head>\n<body>\n"
         f"<h1>{escape(headline)}</h1>\n"
-        f'<p class="meta">{meta}</p>\n'
+        + (
+            '<p class="note">这一页链接到 <code>runs/</code> 下的下钻页；'
+            '单独拷走 index.html 会让这些链接失效 —— 要真正单文件就别加 --html-views。</p>'
+            if views else ""
+        )
+        + f'<p class="meta">{meta}</p>\n'
         + comparison_html
         + f"<h2>运行</h2>\n<table>\n  <tr>{header}</tr>\n" + "\n".join(rows) + "\n</table>\n"
         + "<h2>失败详情</h2>\n"

@@ -31,3 +31,14 @@ def test_dashboard_still_works_without_the_viewer(tmp_path, monkeypatch):
     html = (tmp_path / "rep3" / "index.html").read_text(encoding="utf-8")
     assert "runs/good.html" not in html
     assert "<td>good</td>" in html
+
+
+def test_page_warns_when_it_depends_on_the_runs_directory(tmp_path):
+    """单文件承诺的用法是「把 index.html 拷走」，而 --html-views 会让链接失效 —— 必须当场说清。"""
+    rg.regress(REPO / "examples", asserts=["before:quote_error"], out=tmp_path / "a", html=True, html_views=True)
+    with_views = (tmp_path / "a" / "index.html").read_text(encoding="utf-8")
+    assert "下钻页" in with_views and "单独拷走" in with_views
+
+    rg.regress(REPO / "examples", asserts=["before:quote_error"], out=tmp_path / "b", html=True)
+    single = (tmp_path / "b" / "index.html").read_text(encoding="utf-8")
+    assert "下钻页" not in single, "真正的单文件页面不该出现「依赖 runs/ 目录」这种警告"
