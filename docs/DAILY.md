@@ -275,3 +275,12 @@ $ python tools/cassette_view.py examples/good
 软上限 30000 条 / 24MB 时截断（页面上明说截断了），>500MB 直接拒绝并告诉你去用 grep/jq 切片。
 
 数字：三仓 0 star；Traffic 0；243 passed
+## 2026-10-24（自循环第 16 轮 · README 一屏入口）
+
+产出：README 重排（243 passed）。原来「License / MIT」被夹在正文中间、「遇到这些症状时」在最后一行，而 `init` / `plan` / `flaky` / `export` / `emit` / 查看器这些新东西一个都没写进去。现在前 40 行是：一句话是什么 → `demo` 自证输出 → **60 秒接入三条命令** → 症状表 → 命令一览（11 条，含各自「什么时候用」）。
+
+11 条相对链接全部验过存在（脚本扫 `](./...)` 并逐个 `exists()`）。
+
+**一次不可复现的红，记录在此**：改完 README 第一次跑全量时 `test_broken_chain_is_loud_and_exits_nonzero` 红了一次；单跑它绿，随后连续两次全量 243 passed。按我们自己的规则，这属于「n 小、不能下结论」——先记为环境性抖动，若下一轮再出现，就用 `agenttest flaky` 的思路去量化它，而不是靠记忆判断。
+
+数字：三仓 0 star；Traffic 0；243 passed
