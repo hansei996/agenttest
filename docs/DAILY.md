@@ -162,3 +162,19 @@ $ agenttest init --dir my-repo
 4 条测试锁住三个安全属性：生成三个文件、二次 init 拒绝、**已有测试文件绝不覆盖**（那条专门写了「先放一个自己的测试文件，init 必须失败且文件内容不变」）。
 
 数字：三仓 0 star；Traffic 0；239 passed
+## 2026-10-24（自循环第 12 轮）
+
+产出：`docs/CASSETTE-SPEC.md` 增加「附录 A · 已知实现」+ 一条命令跑完整条互操作链（commit `f6340e7`，239 passed）。
+
+四种实现被列成矩阵（写/读/校验/是否依赖本项目）：主实现 Python、参考实现 Node（**不 import 本项目**）、独立读取器（**import 白名单只有 5 个标准库**）、GitHub Action 包装（在第二个仓库真跑过）。
+
+实测链路（三者互不共享代码）：
+```
+$ node examples/emit-node/emit.mjs /tmp/from-node      → wrote 6 records
+$ python tools/reference_reader.py .../cassette.jsonl  → OK 6 条记录
+$ python tools/validate_cassette.py /tmp/from-node     → PASS: 1/1 个 cassette 通过校验
+```
+
+同时写清了它**没**证明什么：事件序列的语义合法性（校验器只查结构与链）、跨语言浮点极端情况、source-map 等上层问题。这一节比「我们支持跨语言」这种话有用——它给出了可复现的验证方式，也划清了边界。
+
+数字：三仓 0 star；Traffic 0；239 passed
