@@ -100,3 +100,12 @@
 过程记录：手工打补丁时把 HTML 渲染那段改坏了缩进（parts vs items、4 空格 vs 8 空格），py_compile 当场抓到，修好后 227 全绿。这类错误正是「写完就跑一遍」的价值。
 
 数字：三仓 0 star；Traffic 0；227 passed
+## 2026-10-24（自循环第 7 轮）
+
+产出：新增第三篇长尾页 `docs/errors/node-stack-trace-wrong-frame.md`（commit `75167b8`）——讲两件 Node 上最容易搞错的事：V8 栈是**倒序**（第一帧才是抛出点，Python 正好相反），以及栈里出现 `dist/` 时该先开 `--enable-source-maps` 而不是去改编译产物。README 的「遇到这些症状时」表补了这一行。227 passed。
+
+证据来源：页面里的 Node 栈是**本机 node v24.15.0 真跑出来的**（`return raw.timeout` 访问 undefined，10 帧），并用 `tools/extract_frame.py` 跑同一份 stderr，得到 `demo.js:3  (generic, user code)` —— 证明「取第一个用户帧」这条规则在真实 V8 栈上成立。
+
+诚实边界：提取器**不做 source-map 重映射**，页面里写明了这一点以及正确做法（先开 source map，别改 dist）。原本还想写「容器日志」那一页，但本机没有 docker，无法给出真实输出，所以这轮**只写了一页**，不编造命令结果。
+
+数字：三仓 0 star；Traffic 0；227 passed
