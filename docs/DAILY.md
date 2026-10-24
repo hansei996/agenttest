@@ -297,3 +297,18 @@ $ python tools/cassette_view.py examples/good
 结果：`10 次里失败 0 次`，244 passed。
 
 教训写在 DAILY 里：**「一次绿」不构成证据，就像我们不能用 5 次全过主张稳定。** 上一轮我把它记成环境抖动是诚实的；这一轮跑 10 次把它证伪，也是同一套规则在起作用。
+## 2026-10-24（自循环第 18 轮 · 同一个坑的横向排查）
+
+上一轮修了查看器的编码 bug 之后，这轮把仓库里**所有会打印中文的入口**扫了一遍（脚本：非 ASCII + `print(` + 是否有 `_force_utf8`）。
+
+结果 5 个候选里 1 个仍有问题：`tools/dogfood.py` —— 它打印「噪声条数 / 硬退步条数」，但从没钉过 UTF-8。CI 日志和任何按 utf-8 读的父进程都会看到乱码，而**本机带 `PYTHONIOENCODING` 时看不出来**（正是上一轮骗过我的那个变量）。
+
+`src/agenttest/__main__.py` 经检查无需处理：它只调 `cli.main()`，而 cli 自己已经钉了编码。
+
+修法两层：
+1. 给 `dogfood.py` 补 `_force_utf8()`，实测剥掉 `PYTHONIOENCODING`/`PYTHONUTF8` 后中文仍可读；
+2. 加 **lint 测试** `tests/test_encoding_guard.py`：任何 `tools/*.py` 只要含非 ASCII 且 `print(`，就必须出现 `_force_utf8` 或 `reconfigure(encoding="utf-8")`。另有一条行为测试真的剥掉环境变量跑一遍 dogfood 再按 utf-8 解码。
+
+数字：三仓 0 star；Traffic 0；246 passed
+
+为什么这条值得单独一轮：**同一个坑已经踩了三次**（validate_cassette 之后，cassette_view 和 dogfood 各漏一次）。第三次之后不该再靠「我记得」，只能靠规则 —— 这就是 lint 测试存在的理由。
