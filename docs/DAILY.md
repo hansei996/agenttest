@@ -492,3 +492,27 @@ stat: 走另一个入口（agenttest stat 读 batch.jsonl），CI 的 console-sc
 
 数字：三仓 0 star；Traffic 0；280 passed
 
+## 2026-10-25（自循环第 29 轮 · 收口：把 lint 变成每晚自动对账，并修掉证据丢失）
+
+**产出 1**：`doc_lint` 接进两个 CI job，并成为 `verify_all` 的第 9 条主张 —— 现在 `python tools/verify_all.py` 是 **9 / 9 通过**。
+
+```
+PASS  文档里每条命令示例都真实存在（子命令与参数对得上 parser）
+结果：9 / 9 通过
+```
+
+**产出 2（更要紧）**：查 CI 时发现最近多次 run 仍是 **cancelled** —— 说明我上一段以为修好的 `cancel-in-progress` 表达式并没有真起作用。
+
+改法是彻底隔离：`group` 里带上 `${{ github.sha }}`，每个 commit 一个组，`cancel-in-progress: false`。这样连推时没有任何一个 run 会取消旧的。
+
+验证方式是**制造现场**而不是看文档：故意连推两次，然后看两个 run 是否都在。
+```
+in_progress  docs: touch to test back-to-back pushes
+in_progress  ci: give every commit its own concurrency group ...
+   ↓ 150 秒后
+success      docs: touch to test back-to-back pushes
+success      ci: give every commit its own concurrency group ...
+```
+两个 run 同时在跑、都成功 —— 这是「证据不再被自己的 push 吃掉」的直接证明。
+
+数字：三仓 0 star；Traffic 0；280 passed；verify_all 9/9；连推两次全绿
