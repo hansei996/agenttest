@@ -353,3 +353,56 @@ $ python tools/validate_cassette.py $TEMP/at-corrupt/missing-field.jsonl
    在 `event` 键里。本规范按记录描述（第 2 节）。
 4. **`events.validate` 只查必填字段是否存在**，不查类型；本规范把类型列标为"未强制"而不是
    假装它被强制。
+---
+
+## 附录 A · 已知实现（截至 2026-10-24）
+
+规范的可用性不靠声明，靠「有几种独立实现，且它们能互相读懂」。下面是仓库里现存的实现与各自的验证方式。
+
+| 实现 | 语言 | 写 | 读 | 校验 | 不依赖本项目 |
+|---|---|---|---|---|---|
+| `src/agenttest/cassette.py`（主实现） | Python | ✅ | ✅ | 由 `tools/validate_cassette.py` 覆盖 | 否 |
+| `examples/emit-node/emit.mjs`（参考实现） | Node | ✅ | — | 产物过校验器 | **是**（不 import 任何本项目代码） |
+| `tools/reference_reader.py`（第三方读取器） | Python | — | ✅ | 自带哈希重算 | **是**（import 白名单只有 5 个标准库） |
+| `validate/action.yml`（GitHub Action 包装） | YAML | — | — | 在第二个仓库真实跑过 | 调用校验器 |
+
+### 一条命令验完整条链
+
+Node 写出 → 独立读取器读 → 校验器验收（三者互不共享代码）：
+
+```bash
+node examples/emit-node/emit.mjs /tmp/from-node
+python tools/reference_reader.py /tmp/from-node/cassette.jsonl
+python tools/validate_cassette.py /tmp/from-node
+```
+
+真实输出：
+
+```text
+$ node examples/emit-node/emit.mjs /tmp/from-node
+wrote 6 records to /tmp/from-node/cassette.jsonl
+
+$ python tools/reference_reader.py /tmp/from-node/cassette.jsonl
+OK 6 条记录
+  run.start 1
+  model.call 1
+
+$ python tools/validate_cassette.py /tmp/from-node
+PASS: 1/1 个 cassette 通过校验
+```
+
+### 这条链证明了什么、没证明什么
+
+**证明了**：规范化 JSON + 哈希链的定义足够精确，一个不共享代码的实现能算出同样的字节，并被另一个不共享代码的实现接受。
+
+**没证明**：
+- 事件序列的**语义**合法性（例如 `tool.call` 是否有配对的 `tool.result`）——校验器只查结构与链；
+- 跨语言的浮点表示极端情况（本实现只在常见范围内验证过）；
+- source-map / 编码等上层问题（见 `docs/errors/`）。
+
+### 想加一个实现？
+
+1. 按第 3 节的 canonical 规则序列化 `{seq, prev, event}`；
+2. 对它取 sha256，写成 64 位小写十六进制；
+3. 跑 `python tools/validate_cassette.py <你的输出目录>`，12 条规则应当全过；
+4. 如果过不了，先怀疑自己的 canonical 实现（键序、空格、非 ASCII 转义），再看链。
