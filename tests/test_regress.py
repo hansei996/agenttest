@@ -6,6 +6,7 @@ import json
 import shutil
 
 import pytest
+from pathlib import Path
 
 from agenttest import regress as rg
 
@@ -260,3 +261,71 @@ def test_report_json_roundtrip(tmp_path, examples):
     reloaded = rg.load_report(tmp_path / "r" / "report.json")
     assert [run.run_id for run in reloaded.runs] == [run.run_id for run in report.runs]
     assert reloaded.pass_rate == report.pass_rate
+
+
+# ---------- --flaky-report：噪声分栏 ----------
+
+EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
+
+
+def _flaky_json(path, verdict):
+    payload = {
+        "schema_version": "0.1.0",
+        "generated_at": "x",
+        "min_runs": 5,
+        "runs": 5,
+        "unreliable": False,
+        "asserts": [{"expr": "before:quote_error", "runs": 5, "passed": 3, "pass_rate": 0.6,
+                     "low": 0.23, "high": 0.88, "verdict": verdict,
+                     "noisy": verdict == "MIXED_OBSERVED", "note": "x"}],
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _two_run_dirs(tmp_path):
+    base = tmp_path / "base" / "run-1"
+    base.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(EXAMPLES / "good", base)
+    cur = tmp_path / "cur" / "run-1"
+    cur.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(EXAMPLES / "bad", cur)
+    return tmp_path / "base", tmp_path / "cur", tmp_path
+
+
+def test_flaky_report_moves_known_noise_out_of_regressions(tmp_path):
+    base_dir, cur_dir, tmp = _two_run_dirs(tmp_path)
+    rg.regress(base_dir, asserts=["before:quote_error"], out=tmp / "b")
+    flaky = _flaky_json(tmp / "flaky.json", "MIXED_OBSERVED")
+    report = rg.regress(cur_dir, asserts=["before:quote_error"], baseline=tmp / "b" / "report.json", flaky_report=flaky)
+    assert report.comparison.newly_failing == []
+    assert len(report.comparison.newly_failing_noisy) == 1
+    rendered = rg.render_comparison(report.comparison)
+    rendered = rendered if isinstance(rendered, str) else chr(10).join(rendered)
+    assert "噪声失败" in rendered
+
+
+def test_insufficient_runs_is_not_treated_as_noise(tmp_path):
+    base_dir, cur_dir, tmp = _two_run_dirs(tmp_path)
+    rg.regress(base_dir, asserts=["before:quote_error"], out=tmp / "b")
+    flaky = _flaky_json(tmp / "flaky.json", "INSUFFICIENT_RUNS")
+    report = rg.regress(cur_dir, asserts=["before:quote_error"], baseline=tmp / "b" / "report.json", flaky_report=flaky)
+    assert len(report.comparison.newly_failing) == 1
+    assert report.comparison.newly_failing_noisy == []
+
+
+def test_without_flaky_report_behaviour_is_unchanged(tmp_path):
+    base_dir, cur_dir, tmp = _two_run_dirs(tmp_path)
+    rg.regress(base_dir, asserts=["before:quote_error"], out=tmp / "b")
+    report = rg.regress(cur_dir, asserts=["before:quote_error"], baseline=tmp / "b" / "report.json")
+    assert len(report.comparison.newly_failing) == 1
+    assert report.comparison.newly_failing_noisy == []
+
+
+def test_bad_flaky_report_is_loud(tmp_path):
+    base_dir, cur_dir, tmp = _two_run_dirs(tmp_path)
+    rg.regress(base_dir, asserts=["before:quote_error"], out=tmp / "b")
+    broken = tmp / "broken.json"
+    broken.write_text("{not json", encoding="utf-8")
+    with pytest.raises(rg.RegressError):
+        rg.regress(cur_dir, asserts=["before:quote_error"], baseline=tmp / "b" / "report.json", flaky_report=broken)

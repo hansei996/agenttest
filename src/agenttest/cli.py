@@ -122,6 +122,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     reg = subs.add_parser("regress", help="多次运行的回归看板：汇总断言 + 与基线比对")
+    reg.add_argument(
+        "--flaky-report",
+        dest="flaky_report",
+        default=None,
+        help="agenttest flaky --out 生成的报告；已知 MIXED_OBSERVED 的断言失败会归入噪声栏，不计入退步",
+    )
     reg.add_argument("path", help="装着多份 cassette 的目录，或单个 cassette.jsonl")
     reg.add_argument(
         "--assert",
@@ -471,6 +477,7 @@ def _cmd_regress(args) -> int:
             baseline=args.baseline,
             out=args.out,
             html=args.html,
+            flaky_report=getattr(args, "flaky_report", None),
         )
     except (rg.RegressError, CassetteError) as exc:
         print("ERROR " + str(exc), file=sys.stderr)

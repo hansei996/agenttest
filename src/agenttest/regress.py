@@ -94,6 +94,8 @@ class RunResult:
 @dataclass
 class Comparison:
     newly_failing: list = field(default_factory=list)
+    newly_failing_noisy: list = field(default_factory=list)
+    unmatched_asserts: list = field(default_factory=list)
     fixed: list = field(default_factory=list)
     pass_rate_before: float = 0.0
     pass_rate_after: float = 0.0
@@ -108,6 +110,8 @@ class Comparison:
     def to_dict(self) -> dict:
         return {
             "newly_failing": self.newly_failing,
+            "newly_failing_noisy": self.newly_failing_noisy,
+            "unmatched_asserts": self.unmatched_asserts,
             "fixed": self.fixed,
             "pass_rate": {
                 "before": self.pass_rate_before,
@@ -261,7 +265,29 @@ def _delta(before: float, after: float) -> dict:
     return {"before": round(before, 4), "after": round(after, 4), "delta": round(after - before, 4), "percent": percent}
 
 
-def compare(baseline: Report, current: Report) -> Comparison:
+def load_flaky_report(source) -> dict:
+    """读 flaky --out 的 JSON，返回 {断言原文: 判定}。"""
+    import json
+
+    path = Path(source)
+    if not path.exists():
+        raise RegressError("flaky 报告不存在：" + str(path))
+    try:
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+    except ValueError as exc:
+        raise RegressError("flaky 报告不是合法 JSON：" + str(exc)) from exc
+    items = data.get("asserts") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        raise RegressError("flaky 报告缺 asserts 数组：确认它来自 agenttest flaky --out")
+    return {str(item.get("expr") or ""): str(item.get("verdict") or "") for item in items}
+
+
+def noise_only(flaky_map: dict) -> set:
+    """只有 MIXED_OBSERVED 算噪声；INSUFFICIENT_RUNS 证据不足，不能当噪声排除。"""
+    return {expr for expr, verdict in flaky_map.items() if verdict == "MIXED_OBSERVED"}
+
+
+def compare(baseline: Report, current: Report, noise: set | None = None) -> Comparison:
     before = _assert_map(baseline)
     comparison = Comparison(
         pass_rate_before=baseline.pass_rate,
@@ -277,14 +303,18 @@ def compare(baseline: Report, current: Report) -> Comparison:
                 continue  # 基线里没有这条：是新增的 run/断言，不算退步
             if before[key] and not result.ok:
                 failure = next((f for f in run.failures if f.expr == result.expr), None)
-                comparison.newly_failing.append(
-                    {
-                        "run_id": run.run_id,
-                        "expr": result.expr,
-                        "event_index": failure.event_index if failure else None,
-                        "message": result.message,
-                    }
-                )
+                item = {
+                    "run_id": run.run_id,
+                    "expr": result.expr,
+                    "event_index": failure.event_index if failure else None,
+                    "message": result.message,
+                }
+                if noise and result.expr in noise:
+                    comparison.newly_failing_noisy.append(item)
+                else:
+                    comparison.newly_failing.append(item)
+                    if noise and result.expr not in noise:
+                        comparison.unmatched_asserts.append(result.expr)
             elif not before[key] and result.ok:
                 comparison.fixed.append({"run_id": run.run_id, "expr": result.expr})
     comparison.cost = {
@@ -363,6 +393,7 @@ def regress(
     baseline=None,
     out=None,
     html: bool = False,
+    flaky_report=None,
 ) -> Report:
     """跑一遍看板：汇总每个 run 的断言结果，可选与基线比对，可选落盘。"""
     asserts = list(asserts)
@@ -374,8 +405,11 @@ def regress(
         runs=runs,
         generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
+    noise = set()
+    if flaky_report is not None:
+        noise = noise_only(load_flaky_report(flaky_report))
     if baseline is not None:
-        report.comparison = compare(load_report(baseline), report)
+        report.comparison = compare(load_report(baseline), report, noise=noise)
     if out is not None:
         report.written = write_outputs(report, out, html=html)
     return report
@@ -480,6 +514,21 @@ def render_comparison(comparison: Comparison) -> str:
             lines.append(f"    - {item['run_id']} / {item['expr']}（{where}）")
     else:
         lines.append("  新增失败    0 条")
+    noisy = getattr(comparison, "newly_failing_noisy", [])
+    if noisy:
+        lines.append(f"  噪声失败    {len(noisy)} 条（已知不稳定，不计入退步）")
+        for item in noisy:
+            where = (
+                f"第 {item['event_index']} 个事件"
+                if item.get("event_index")
+                else "失败事件未定位"
+            )
+            lines.append(f"    ~ {item['run_id']} / {item['expr']}（{where}）")
+        if not comparison.newly_failing:
+            lines.append(
+                "  注意        本次失败全部来自已知不稳定断言（MIXED_OBSERVED），未阻止 CI —— "
+                "它们被分栏而不是被隐藏"
+            )
     if comparison.fixed:
         lines.append(f"  修好        {len(comparison.fixed)} 条")
         for item in comparison.fixed:
@@ -588,6 +637,20 @@ def render_html(report: Report) -> str:
     comparison_html = ""
     if report.comparison:
         items = []
+        noisy = getattr(report.comparison, "newly_failing_noisy", []) if report.comparison else []
+        if noisy:
+            items.append("<h2>噪声失败（已知不稳定，不计入退步）</h2><ul>")
+            for item in noisy:
+                where = (
+                    f"第 {item['event_index']} 个事件"
+                    if item.get("event_index")
+                    else "失败事件未定位"
+                )
+                items.append(
+                    f"    <li><strong>{escape(str(item.get('run_id')))}</strong> / "
+                    f"<code>{escape(str(item.get('expr')))}</code> — {escape(where)}</li>"
+                )
+            items.append("</ul>")
         if report.comparison.newly_failing:
             items.append("<h2>新增失败（退步）</h2><ul>")
             for item in report.comparison.newly_failing:
