@@ -51,3 +51,12 @@ agent 有三类问题，现有测试全都测不到：
 ## License
 
 MIT
+## 遇到这些症状时
+
+| 症状 | 看哪一页 |
+|---|---|
+| 升级模型 / 改了 prompt 之后感觉行为变了 | [docs/errors/behaviour-changed-after-upgrade.md](./docs/errors/behaviour-changed-after-upgrade.md) |
+| agent 测试时过时不过、本地过 CI 不过 | [docs/errors/flaky-agent-tests.md](./docs/errors/flaky-agent-tests.md) |
+| 只想从别的语言/进程里产出 cassette | [docs/EMIT.md](./docs/EMIT.md) |
+| 想知道报告怎么进 CI 看板 | `agenttest export --format junit` 或 `--format sarif` |
+
