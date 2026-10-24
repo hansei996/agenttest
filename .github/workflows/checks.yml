@@ -32,6 +32,10 @@ jobs:
         env:
           PYTHONPATH: src
         run: python -m agenttest demo
+      - name: dogfood (flaky report -> regress noise column)
+        env:
+          PYTHONPATH: src
+        run: python tools/dogfood.py
       - name: cli acceptance
         env:
           PYTHONPATH: src
@@ -102,3 +106,7 @@ jobs:
         shell: pwsh
         run: |
           python -c "import pathlib,sys; t=pathlib.Path('examples/.work/good/src/auth.py').read_bytes(); sys.exit('CRLF leaked into a hashed artifact' if b'\r\n' in t else 0)"
+      - name: dogfood (flaky report -> regress noise column)
+        env:
+          PYTHONPATH: src
+        run: python tools/dogfood.py
