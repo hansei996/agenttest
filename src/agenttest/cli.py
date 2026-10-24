@@ -201,6 +201,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="退出码策略（默认 %(default)s，只报告不拦人）",
     )
 
+    ini = subs.add_parser("init", help="在当前仓库生成最小回归骨架（只新建文件，不覆盖）")
+    ini.add_argument("--dir", dest="target", default=".", help="目标目录，默认当前目录")
     pla = subs.add_parser("plan", help="样本量规划：想把失败率上限证到某个水平，最少要跑多少次")
     pla.add_argument("--bound", type=float, default=None, help="目标下界（0-1），例如 0.9 表示「失败率 ≤10%」")
     pla.add_argument("--json", action="store_true", help="机器可读输出")
@@ -262,6 +264,8 @@ def main(argv: list | None = None) -> int:
         return _cmd_regress(args)
     if args.verb == "flaky":
         return _cmd_flaky(args)
+    if args.verb == "init":
+        return _cmd_init(args)
     if args.verb == "plan":
         return _cmd_plan(args)
     if args.verb == "export":
@@ -600,4 +604,21 @@ def _cmd_plan(args) -> int:
     print()
     print("  读法：想主张「失败率 ≤10%」，就得先跑 " + str([r for r in rows if r["bound"] == 0.9][0]["runs"] if any(r["bound"] == 0.9 for r in rows) else 35) + " 次并全部通过。")
     print("  没有这个样本量时，任何「它很稳定」的说法都只是点估计。")
+    return EXIT_OK
+
+def _cmd_init(args) -> int:
+    from .init import InitError, init as run_init
+
+    try:
+        result = run_init(args.target)
+    except InitError as exc:
+        print("ERROR " + str(exc), file=sys.stderr)
+        return EXIT_FAIL
+    print("已在 " + result["root"] + " 生成骨架：")
+    for path in result["created"]:
+        print("  + " + path)
+    print()
+    print("下一步：")
+    for i, step in enumerate(result["next"], 1):
+        print("  " + str(i) + ") " + step)
     return EXIT_OK
