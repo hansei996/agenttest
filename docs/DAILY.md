@@ -222,3 +222,23 @@ $ python tools/validate_cassette.py /tmp/from-node     → PASS: 1/1 个 cassett
 同时写清了它**没**证明什么：事件序列的语义合法性（校验器只查结构与链）、跨语言浮点极端情况、source-map 等上层问题。这一节比「我们支持跨语言」这种话有用——它给出了可复现的验证方式，也划清了边界。
 
 数字：三仓 0 star；Traffic 0；239 passed
+## 2026-10-24（自循环第 13 轮 · 陌生人测试）
+
+做法：新建一个只会算订单总额的小仓库（`agent.py` + `orders.jsonl`），假装自己从没听过 agenttest，按 README 的顺序走一遍并计时。
+
+**第一次走，卡死了。** 两个真问题：
+1. `init` 生成的下一步写着 `agenttest record ...`，但 `record` 要求 agent 用 `agenttest.agent.Session` 说话。陌生人照做 → `ERROR 没录到任何事件`。**我们让自己产品的第一屏指示走了条死路。**
+2. 就算改用能跑的 `record-subprocess`（进程层观测，2 个事件），骨架里那条 `before:quote_error` 也会红 —— 因为进程层观测根本看不到 `model.result`。陌生人会以为是自己搞错了。
+
+修法（commit 见 git log，239 passed）：
+- 骨架首推 **record-subprocess**（任何 CLI agent 不用改代码），`record` / `import` 降为另外两条路径，并写清各自能观测到什么；
+- 那条行为断言加 **skip 守卫**：cassette 里没有 `model.result` 就 `pytest.skip` 并说明原因 —— 绿着，但把差异讲清楚；
+- `init` 的 next 步骤同步改成 record-subprocess。
+
+第三次走（修完）：
+```
+$ agenttest init && agenttest record-subprocess runs/latest -- python agent.py && pytest
+2 passed, 1 skipped in 0.02s        TOTAL elapsed=1s
+```
+
+耗时记录：init <1s、record-subprocess <1s、pytest 0.02s。**「5 分钟接入」这个目标现在是 1 秒级的，卡点不在时间而在指示错误** —— 这就是为什么必须假装陌生人走一遍，光看文档看不出来。
