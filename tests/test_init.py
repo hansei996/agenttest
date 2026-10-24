@@ -38,6 +38,7 @@ def test_generated_skeleton_imports_cleanly(tmp_path):
     generated = tmp_path / "tests" / "test_agent_behaviour.py"
     src = generated.read_text(encoding="utf-8")
     assert "from agenttest.pytest_plugin import" in src
-    assert "assert_before(cassette" in src
+    assert "record-subprocess" in src, "骨架必须指向真正能用的录制路径"
+    assert "pytest.skip" in src, "没有 model 事件的 cassette 必须跳过而不是假装失败"
     # 只做语法检查，不执行（执行需要提供 cassette）
     compile(src, str(generated), "exec")
