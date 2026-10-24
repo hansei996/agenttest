@@ -701,17 +701,38 @@ def render_html(report: Report) -> str:
             + "</table>"
         )
 
-    return (
+    headline = _headline(report)
+    meta = (
+        f"{len(report.runs)} 次运行 · {report.passed_runs} 次通过（{report.pass_rate * 100:.0f}%）"
+        + " · 断言：" + escape(", ".join(report.asserts) or "（无）")
+        + f" · 生成于 {escape(report.generated_at)}"
+    )
+    body = (
         "<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"utf-8\">\n"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
-        f"<title>agenttest regress — {escape(report.root)}</title>\n"
+        f"<title>{escape(headline)}</title>\n"
         f"<style>{_CSS}</style>\n</head>\n<body>\n"
-        f"<h1>agenttest regress</h1>\n"
-        f'<p class="meta">根目录 {escape(report.root)} · {len(report.runs)} 次运行 · '
-        f"{report.passed_runs} 次通过（{report.pass_rate * 100:.0f}%） · "
-        f"生成于 {escape(report.generated_at)}</p>\n"
-        f"<table>\n  <tr>{header}</tr>\n" + "\n".join(rows) + "\n</table>\n"
-        "<h2>失败详情</h2>\n" + ("<ul>\n" + "\n".join(failures_html) + "\n</ul>\n" if failures_html else "<p>无</p>\n")
+        f"<h1>{escape(headline)}</h1>\n"
+        f'<p class="meta">{meta}</p>\n'
         + comparison_html
+        + f"<h2>运行</h2>\n<table>\n  <tr>{header}</tr>\n" + "\n".join(rows) + "\n</table>\n"
+        + "<h2>失败详情</h2>\n"
+        + ("<ul>\n" + "\n".join(failures_html) + "\n</ul>\n" if failures_html else "<p>无</p>\n")
         + "\n</body>\n</html>\n"
     )
+    return body
+
+
+def _headline(report: Report) -> str:
+    """一句话结论放在最上面：截图的人要的是这句，不是工具名。"""
+    total = len(report.runs)
+    if total == 0:
+        return "没有找到任何 cassette"
+    failed = total - report.passed_runs
+    if failed == 0:
+        return "%d 次运行，全部通过" % total
+    exprs = []
+    for _run, failure in report.failures:
+        if failure.expr not in exprs:
+            exprs.append(failure.expr)
+    return "%d 次运行里 %d 次没通过 %s" % (total, failed, "、".join(exprs) or "断言")

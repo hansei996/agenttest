@@ -329,3 +329,28 @@ def test_bad_flaky_report_is_loud(tmp_path):
     broken.write_text("{not json", encoding="utf-8")
     with pytest.raises(rg.RegressError):
         rg.regress(cur_dir, asserts=["before:quote_error"], baseline=tmp / "b" / "report.json", flaky_report=broken)
+
+
+# ---------- HTML 首屏：一句话结论 ----------
+
+def test_html_headline_states_the_conclusion_not_the_tool_name(tmp_path):
+    base_dir, cur_dir, tmp = _two_run_dirs(tmp_path)
+    report = rg.regress(cur_dir, asserts=["before:quote_error"], out=tmp / "r", html=True)
+    html = (tmp / "r" / "index.html").read_text(encoding="utf-8")
+    assert "<h1>1 次运行里 1 次没通过 before:quote_error</h1>" in html
+    assert "<h1>agenttest regress</h1>" not in html
+
+
+def test_html_all_pass_headline_says_so(tmp_path):
+    base_dir, cur_dir, tmp = _two_run_dirs(tmp_path)
+    report = rg.regress(base_dir, asserts=["before:quote_error"], out=tmp / "r2", html=True)
+    html = (tmp / "r2" / "index.html").read_text(encoding="utf-8")
+    assert "<h1>1 次运行，全部通过</h1>" in html
+
+
+def test_html_does_not_leak_absolute_root_path(tmp_path):
+    base_dir, cur_dir, tmp = _two_run_dirs(tmp_path)
+    report = rg.regress(cur_dir, asserts=["before:quote_error"], out=tmp / "r3", html=True)
+    html = (tmp / "r3" / "index.html").read_text(encoding="utf-8")
+    assert str(tmp).replace("\\", "/") not in html
+    assert str(tmp) not in html
