@@ -27,7 +27,8 @@
 测试              251 passed（本机）；verify_all 8/8
 CI                windows 上真的抓到过 cp936 那个 bug（run 40087231408），已修
                   —— 但也暴露另一件事：最近 20 次 run 里 15 次被 cancel-in-progress 取消，
-                     等于「push 了但常常没有完成的证据」。已改成只在 PR 上取消。
+                     等于「push 了但常常没有完成的证据」。已改成只在 PR 上取消，
+                     修完连推两次分别 1m55s / 1m6s 全部 success（run 40087645110 / 40087634415）。
 star              0 / 0 / 0（agenttest、read-the-logs-first、blame-archaeology）
 forks / watchers  0 / 0
 Traffic           0 views / 0 uniques（此前读数，今晚未变）
