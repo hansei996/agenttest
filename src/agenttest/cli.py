@@ -201,6 +201,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="退出码策略（默认 %(default)s，只报告不拦人）",
     )
 
+    pla = subs.add_parser("plan", help="样本量规划：想把失败率上限证到某个水平，最少要跑多少次")
+    pla.add_argument("--bound", type=float, default=None, help="目标下界（0-1），例如 0.9 表示「失败率 ≤10%」")
+    pla.add_argument("--json", action="store_true", help="机器可读输出")
     exp = subs.add_parser("export", help="把 regress 报告导出成 JUnit / SARIF")
     exp.add_argument("report", help="regress 生成的 report.json")
     exp.add_argument("--format", dest="fmt", required=True, choices=["junit", "sarif"], help="导出格式")
@@ -259,6 +262,8 @@ def main(argv: list | None = None) -> int:
         return _cmd_regress(args)
     if args.verb == "flaky":
         return _cmd_flaky(args)
+    if args.verb == "plan":
+        return _cmd_plan(args)
     if args.verb == "export":
         from .export import export as _export
 
@@ -573,3 +578,26 @@ def _cmd_export(args, export_fn) -> int:
     else:
         print("导出      " + args.fmt + " -> " + str(args.out))
     return 0
+
+def _cmd_plan(args) -> int:
+    import json as _json
+
+    from .plan import PlanError, plan, table
+
+    try:
+        rows = [plan(args.bound)] if args.bound is not None else table()
+    except PlanError as exc:
+        print("ERROR " + str(exc), file=sys.stderr)
+        return EXIT_FAIL
+    if args.json:
+        print(_json.dumps(rows, ensure_ascii=False, indent=2))
+        return EXIT_OK
+    print("样本量规划（跑 n 次全部通过时，能排除多大的失败率）")
+    print("  目标下界   需要次数   可排除失败率")
+    print("  --------   --------   ------------")
+    for row in rows:
+        print("  %-10.2f %-10d > %.0f%%" % (row["bound"], row["runs"], row["fail_rate_ceiling"] * 100))
+    print()
+    print("  读法：想主张「失败率 ≤10%」，就得先跑 " + str([r for r in rows if r["bound"] == 0.9][0]["runs"] if any(r["bound"] == 0.9 for r in rows) else 35) + " 次并全部通过。")
+    print("  没有这个样本量时，任何「它很稳定」的说法都只是点估计。")
+    return EXIT_OK
