@@ -473,3 +473,21 @@ stat: 走另一个入口（agenttest stat 读 batch.jsonl），CI 的 console-sc
 - 未知形式必须抛错，不许静默通过。
 
 数字：三仓 0 star；Traffic 0；278 passed
+## 2026-10-25（自循环第 28 轮 · 文档里的命令也要能跑）
+
+做了 tools/doc_lint.py：从真实的 argparse parser 里抽出 12 个子命令和它们接受的参数，然后去扫 README / llms.txt / docs/**/*.md 的**围栏代码块**，逐条核对。
+
+第一版报了 5 个问题，**5 个全是我的 linter 冤枉的**：
+
+| 报的问题 | 真相 |
+|---|---|
+| record-subprocess 不接受 --task | --task 属于 `--` 之后被调用的用户程序 |
+| record 不接受 --script | 同上，--script 是 fake_agent.py 的参数 |
+| 没有 emit 子命令 | 那是行内代码里的模块名 agenttest emit，不是命令 |
+| records / replays 不存在 | 英文散文把 agenttest 当主语（Announcement 里的句子） |
+
+三处修正：遇到裸 `--` 就停止扫参数、只扫围栏代码块不扫行内代码、英文散文用显式 IGNORE 列表豁免（附理由，不用正则去猜）。修完 `DOC LINT OK`，扫 64 条命令。
+
+另一条测试专门证明这个 lint **不是恒真**：往文档里塞一条 `agenttest definitely-not-a-verb`，它必须红，然后恢复原文。
+
+数字：三仓 0 star；Traffic 0；280 passed
