@@ -56,3 +56,12 @@
 卡点：ComposioHQ 组织 OAuth 授权（只有用户能做）；其余无阻塞
 
 为什么这轮做 emit 而不是做功能：格式扩散的唯一引擎是「生产成本足够低」。消费端再强，没人愿意产出 cassette 就没有意义。这一条来自 `archaeology-transcript` 的判断，采纳。
+## 2026-10-24（自循环第 3 轮）
+
+产出：两篇长尾报错文档 `docs/errors/behaviour-changed-after-upgrade.md`（升级模型后行为变了）与 `docs/errors/flaky-agent-tests.md`（时过时不过），README 加了「遇到这些症状时」入口表。commit `727b9d3`，223 passed。
+
+为什么做这个：人是用**错误信息**搜索的。这两页覆盖的是「没有栈、只有感觉」的那类问题（行为漂移）与最常见的误判（跑 5 次过 3 次就断言它 flaky）。两页的命令与输出都是本机真跑出来的，不是编的。
+
+数字：三仓 0 star；Traffic 0；223 passed；CI 上一轮 pending→需在下一轮开始时确认
+
+卡点：无（ComposioHQ 授权仍等用户）
