@@ -449,3 +449,27 @@ bad.html  good.html
 三条测试：块必须在前 14 行内、总长 ≤320 字、且**必须含数字或反引号命令**（空话救不了人）。
 
 数字：三仓 0 star；Traffic 0；267 passed
+## 2026-10-25（自循环第 27 轮 · 六种语法逐个验）
+
+llms.txt 里写着六种断言语法（before: / tool: / never:tool= / touched: / exit: / stat:），但此前我只实测过其中几种。这轮把每一种都在真实 cassette 上跑了一遍。
+
+结果：六种全部正确，没有一个是文档吹出来的。
+
+```
+before:quote_error        good PASS     bad FAIL
+tool:read_file            good PASS
+never:tool=edit_file      good PASS     bad FAIL（它真的调了 edit_file）
+touched:src/auth.py       good PASS     bad FAIL（没碰那个文件）
+exit:0                    good PASS     exit:1 FAIL
+```
+
+stat: 走另一个入口（agenttest stat 读 batch.jsonl），CI 的 console-script 步骤一直在跑，所以这轮没重复。
+
+新测试 tests/test_assertion_forms.py（11 条）：
+- 5 种形式在守规矩的运行上必须通过；
+- 3 种在偷懒的运行上必须失败 —— **断言形同虚设最常见的原因是它永远为真**；
+- exit:1 在退出码 0 上必须失败（证明它不是恒真）；
+- llms.txt 里出现的形式必须被这份测试覆盖（文档加语法、测试没加就红）；
+- 未知形式必须抛错，不许静默通过。
+
+数字：三仓 0 star；Traffic 0；278 passed
