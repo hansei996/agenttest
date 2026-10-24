@@ -387,3 +387,18 @@ bad.html  good.html
 三条测试锁住：链接存在且目标文件真的是自包含页（无外部 http）、`run_views` 进 report.written、以及**没有 tools/ 时看板照常出、只是没有链接**（用 monkeypatch 模拟只装了 wheel 的情况）。
 
 数字：三仓 0 star；Traffic 0；256 passed
+## 2026-10-25（自循环第 23 轮 · 文档与 CLI 不许分家）
+
+产出：`docs/REGRESS.md` 补三节（噪声分栏的用法与规则、下钻链接、`plan` 的问代价方式），README 命令表补 `--html-views`。259 passed。
+
+这一轮最有价值的是最后加的测试 `tests/test_docs_match_cli.py`：它扫文档里出现的所有 `--flag`，逐个去 `cli.py` 里找，找不到就红。
+
+```
+文档提到但 CLI 里没有的开关： <空>
+```
+
+为什么值得：文档写着一个不存在的开关，是比没写更糟的体验 —— 用户照着敲，得到 `unrecognized arguments`，然后开始怀疑整个工具。这和 R13 那个「init 指向 99% 用户用不了的录制路径」是同一类错误：**文档里的承诺必须能在代码里找到**。
+
+另有两条：噪声三规则必须原文出现在文档里（只有 MIXED_OBSERVED 算噪声 / 证据不足不算免责 / 不给报告时行为不变），以及 README 命令表必须提到 `--flaky-report`、`--html-views`、`plan`。
+
+数字：三仓 0 star；Traffic 0；259 passed
