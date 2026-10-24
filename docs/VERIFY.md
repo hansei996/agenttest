@@ -3,7 +3,7 @@
 > 这份文件由 `python tools/verify_all.py --write-doc` 生成，不要手改。
 > 每一条都是「主张 → 命令 → 结果」，谁不信就自己跑一遍。
 
-当前结果：**8 / 8 通过**
+当前结果：**9 / 9 通过**
 
 | # | 主张 | 复跑命令 | 结果 |
 |---|---|---|---|
@@ -15,6 +15,7 @@
 | 6 | 统计主张有确切样本量：失败率 <=1% 需 381 次运行 | `python -c 'from agenttest.flaky import runs_needed; print(runs_needed(0.99))'` | PASS |
 | 7 | 查看器当场重算哈希链，断链时非零退出 | `python tools/cassette_view.py <被篡改的 cassette>` | PASS |
 | 8 | 剥掉编码环境变量后，中文输出仍按 UTF-8 可读 | `python tools/dogfood.py   （不设 PYTHONIOENCODING）` | PASS |
+| 9 | 文档里每条命令示例都真实存在（子命令与参数对得上 parser） | `python tools/doc_lint.py` | PASS |
 
 ## 这份清单**不**覆盖什么
 

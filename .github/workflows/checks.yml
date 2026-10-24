@@ -41,6 +41,10 @@ jobs:
         env:
           PYTHONPATH: src
         run: python tools/bench.py --quick
+      - name: docs must not promise commands that do not exist
+        env:
+          PYTHONPATH: src
+        run: python tools/doc_lint.py
       - name: cli acceptance
         env:
           PYTHONPATH: src
@@ -119,3 +123,7 @@ jobs:
         env:
           PYTHONPATH: src
         run: python tools/bench.py --quick
+      - name: docs must not promise commands that do not exist
+        env:
+          PYTHONPATH: src
+        run: python tools/doc_lint.py

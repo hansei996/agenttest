@@ -134,6 +134,14 @@ def checks(tmp):
         (out.strip().splitlines() or [""])[0],
     )
 
+    code, out = sh([py, "tools/doc_lint.py"])
+    add(
+        "文档里每条命令示例都真实存在（子命令与参数对得上 parser）",
+        "python tools/doc_lint.py",
+        code == 0 and "DOC LINT OK" in out,
+        (out.strip().splitlines() or [""])[0],
+    )
+
     return items
 
 
