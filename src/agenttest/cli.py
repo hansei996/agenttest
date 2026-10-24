@@ -123,6 +123,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     reg = subs.add_parser("regress", help="多次运行的回归看板：汇总断言 + 与基线比对")
     reg.add_argument(
+        "--html-views",
+        dest="html_views",
+        action="store_true",
+        help="配合 --html：额外为每个 run 生成下钻页（默认只出一个单文件 HTML）",
+    )
+    reg.add_argument(
         "--flaky-report",
         dest="flaky_report",
         default=None,
@@ -487,6 +493,7 @@ def _cmd_regress(args) -> int:
             out=args.out,
             html=args.html,
             flaky_report=getattr(args, "flaky_report", None),
+            html_views=getattr(args, "html_views", False),
         )
     except (rg.RegressError, CassetteError) as exc:
         print("ERROR " + str(exc), file=sys.stderr)

@@ -394,6 +394,7 @@ def regress(
     out=None,
     html: bool = False,
     flaky_report=None,
+    html_views: bool = False,
 ) -> Report:
     """跑一遍看板：汇总每个 run 的断言结果，可选与基线比对，可选落盘。"""
     asserts = list(asserts)
@@ -411,11 +412,52 @@ def regress(
     if baseline is not None:
         report.comparison = compare(load_report(baseline), report, noise=noise)
     if out is not None:
-        report.written = write_outputs(report, out, html=html)
+        report.written = write_outputs(report, out, html=html, html_views=html_views)
     return report
 
 
-def write_outputs(report: Report, out, html: bool = False) -> dict:
+
+
+def _slug(text: str) -> str:
+    """run id 变成安全文件名：只留字母数字与 - _ 。"""
+    keep = [ch if (ch.isalnum() or ch in "-_") else "_" for ch in str(text)]
+    return "".join(keep).strip("_") or "run"
+
+
+def write_run_views(report: Report, html_dir: Path) -> dict:
+    """给每个 run 生成一份 cassette 查看器页面，返回 {run_id: 相对路径}。
+
+    拿不到查看器模块（例如只装了 wheel、tools/ 不在）时返回空 dict ——
+    看板照常出，只是没有下钻链接，而不是整个报告失败。
+    """
+    spec_path = Path(__file__).resolve().parents[2] / "tools" / "cassette_view.py"
+    if not spec_path.exists():
+        return {}
+    try:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("agenttest_cassette_view", spec_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)  # type: ignore[union-attr]
+    except Exception:
+        return {}
+
+    views = {}
+    target_dir = html_dir / "runs"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    for run in report.runs:
+        if run.error:
+            continue
+        try:
+            data = module.load(Path(run.path))
+            name = _slug(run.run_id) + ".html"
+            (target_dir / name).write_text(module.render(data, "cassette · " + str(run.run_id)), encoding="utf-8")
+            views[run.run_id] = "runs/" + name
+        except Exception:
+            continue
+    return views
+
+def write_outputs(report: Report, out, html: bool = False, html_views: bool = False) -> dict:
     """把 report 落盘；--html 时同时产出单文件 index.html。"""
     out_path = Path(out)
     if out_path.suffix.lower() == ".json":
@@ -432,8 +474,12 @@ def write_outputs(report: Report, out, html: bool = False) -> dict:
     if html:
         html_path = html_dir / HTML_NAME
         html_path.parent.mkdir(parents=True, exist_ok=True)
-        html_path.write_bytes(render_html(report).encode("utf-8"))
+        # 默认保持「单文件」承诺；--html-views 才额外写出每个 run 的下钻页
+        views = write_run_views(report, html_dir) if html_views else {}
+        html_path.write_bytes(render_html(report, views=views).encode("utf-8"))
         written["html"] = str(html_path)
+        if views:
+            written["run_views"] = str(html_dir / "runs")
     return written
 
 
@@ -593,7 +639,7 @@ ul { margin: .25rem 0 1rem 1.2rem; padding: 0; }
 """
 
 
-def render_html(report: Report) -> str:
+def render_html(report: Report, views: dict | None = None) -> str:
     def cell(ok: bool, text: str = "") -> str:
         word = "PASS" if ok else "FAIL"
         return f'<td class="{ "pass" if ok else "fail" }">{word}{escape(text)}</td>'
@@ -602,7 +648,10 @@ def render_html(report: Report) -> str:
     for run in report.runs:
         status = "ERROR" if run.error else ("PASS" if run.passed else "FAIL")
         status_class = "err" if run.error else ("pass" if run.passed else "fail")
-        cells = [f"<td>{escape(run.run_id)}</td>"]
+        if views and run.run_id in views:
+            cells = [f'<td><a href="{escape(views[run.run_id])}">{escape(run.run_id)}</a></td>']
+        else:
+            cells = [f"<td>{escape(run.run_id)}</td>"]
         marks = {result.expr: result for result in run.assertions}
         for expr in report.asserts:
             result = marks.get(expr)
