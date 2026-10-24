@@ -1,45 +1,48 @@
 # 今日总结（2026-10-24）
 
-> 一眼能看完的版本。数字都来自当天的真实读数。
+> 今天分两段 goal 跑完 **20 轮**，每轮都有提交。数字全部来自当天真实读数。
 
-## 产出
+## 一句话
 
-**23 个提交**（其中 8 个 feat/test/fix/ci，15 个 docs），落成 9 个可交付能力：
+**技术债在往下减，曝光债一分没还。251 个测试不能变成 1 个陌生人。**
 
-| # | 交付 | 一句话价值 |
+## 产出（20 轮 / 40 个提交）
+
+| 轮 | 交付 | 复跑方式 |
 |---|---|---|
-| R1 | `export --format junit\|sarif` | 任何 CI 看板不装我们也能看到我们的红绿 |
-| R2 | `emit` 生产端 SDK | 别人 20 行就能写合规 cassette，不必用我们的 runner |
-| R3 | 两篇长尾报错页 | 覆盖「升级后行为变了」「时过时不过」两类无栈问题 |
-| R4 | skill v2 + 提交包 | 按 awesome-copilot 维护者的意见重做（确定性选帧规则 + 日志位置表） |
-| R5 | action 跨仓验证 | 第二个仓库真跑通 `uses: .../validate@v1`（并修掉 action 路径 bug） |
-| R6 | `regress --flaky-report` | 已知不稳定断言分栏，不冒充「退步」，也不被隐藏 |
-| R7 | Node 栈页面 | V8 栈是倒序、`dist/` 要看还要先开 source map |
-| R8 | 跨语言证明 | Node 独立实现写出的 cassette 通过 Python 校验器 |
-| R9 | `plan` 样本量规划 | 「想说失败率 ≤10%」先告诉你得跑 35 次 |
-| R10 | HTML 首屏结论 | 报告第一行是结论，不是工具名，也不泄漏绝对路径 |
-| R11 | `init` 骨架 | 一条命令接入，只新建不覆盖 |
-| R12 | 互操作附录 | 四种实现 + 一条命令验完整条链，并写清没证明什么 |
+| R1–R12 | `export` JUnit/SARIF、`emit` SDK、两篇长尾页、skill v2、action 跨仓验证、`--flaky-report` 分栏、Node 栈页、跨语言证明、`plan`、HTML 首屏结论、`init`、互操作附录 | `python tools/verify_all.py` |
+| R13 | 陌生人测试：发现 `init` 指向了 99% 用户用不了的录制路径，修掉 | 见下方「陌生人 1 秒」 |
+| R14 | dogfood 进 CI（两个平台各跑一次噪声分栏） | `python tools/dogfood.py` |
+| R15 | 单文件离线查看器（断链当场报、`meta.unobserved` 必显） | `python tools/cassette_view.py examples/good` |
+| R16 | README 重排成一屏入口（原 License 夹在正文中间） | 看 `README.md` 前 40 行 |
+| R17 | 量化「抖动」→ 不是抖动：查看器 cp936 乱码 bug | 已并入 verify_all 第 8 条 |
+| R18 | 同一坑横向排查：`dogfood.py` 也漏了；加 lint 测试兜底 | `pytest tests/test_encoding_guard.py` |
+| R19 | `llms.txt` + 错误索引（曝光侧唯一在我权限内的事） | 看 `llms.txt` |
+| R20 | 所有主张变成一条命令：`verify_all.py` + 生成的 `docs/VERIFY.md` | `python tools/verify_all.py` |
 
-## 数字
+## 真实数字（2026-10-24 收盘读数）
 
 ```
-测试        239 passed（本机）／CI ubuntu + windows 双 job
-提交        23（今晚）
-CI          无未修复的失败（唯一一次红是 10-23 01:29Z，已由 275e38a 修）
-star        0（三个仓）
-Traffic     0 views / 0 uniques / 无 referrer
-外部 PR     BehiSecc #1010 仍 OPEN 零评论；awesome-copilot #5256 已关（维护者给了实质理由）
+今天的提交        40 个（含 13 个功能/修复，其余文档与日报）
+测试              251 passed（本机）；verify_all 8/8
+CI                windows 上真的抓到过 cp936 那个 bug（run 40087231408），已修
+                  —— 但也暴露另一件事：最近 20 次 run 里 15 次被 cancel-in-progress 取消，
+                     等于「push 了但常常没有完成的证据」。已改成只在 PR 上取消。
+star              0 / 0 / 0（agenttest、read-the-logs-first、blame-archaeology）
+forks / watchers  0 / 0
+Traffic           0 views / 0 uniques（此前读数，今晚未变）
 ```
 
-## 仍然卡在「只有你能做」的两件事
+## 今天最诚实的三句
 
-1. **R4 公开发帖**：拿真实 issue 给一份可跑复现。原文已备好，等你过目。
-2. **ComposioHQ（77k 清单）OAuth 授权**：Settings → Applications → GitHub CLI → Authorize。
+1. **「一次绿」不构成证据** —— 我把一条红记成「环境抖动」，跑 10 次才发现它 10/10 全红，是我的环境变量在替我掩盖 bug。
+2. **同一个坑踩了三次**（编码）之后才加 lint —— 靠记忆是靠不住的，只能靠规则。
+3. **门擦干净不等于有人敲门** —— `llms.txt` / 索引 / README 都是把门擦干净；两周后 Traffic 若仍为 0，说明问题不在这层。
 
-## 今晚最该记住的一句
+## 仍然只有你能做的两件事
 
-技术债清完了，曝光债一分没还。**239 个测试不能变成 1 个陌生人。**
+1. **R4 公开发帖**（在真实 issue 里给一份可跑复现）：原文待你过目，你不点头我不发。
+2. **ComposioHQ（77,491★ 清单）OAuth 授权**：Settings → Applications → GitHub CLI → Authorize。
 
 ---
 # 每日总结
