@@ -48,3 +48,17 @@ python tools/validate_cassette.py runs/fix-auth
 - 你的 agent 跑在别的语言/进程里，只想在退出前吐出一份结构化的运行记录
 - 你想把已有的 trace（OpenTelemetry、自研日志）映射成 cassette，但不想写一个完整 importer
 - 你要在测试里手搓一份最小 cassette（例如构造一个「必须失败」的对照样本）
+## 非 Python 实现（跨语言证明）
+
+`examples/emit-node/emit.mjs` 用 Node 从零写出一份 cassette：**不 import agenttest、不装任何包**，
+自己实现规范里的三项要求——键按码点升序、逗号冒号后无空格、非 ASCII 原样输出，然后算 sha256 链。
+
+```bash
+node examples/emit-node/emit.mjs runs/node-demo
+python tools/validate_cassette.py runs/node-demo
+#   结果: PASS（12 条规则全部通过）
+```
+
+这条命令的意义不是「Node 也能用」，而是：**规范是可被第三方实现的**。
+如果两种语言各自独立实现后算出的哈希能被同一份校验器接受，那份 spec 就不再是我们仓库的私有约定。
+（对应测试：`tests/test_emit_node.py`，没装 node 时自动跳过。）
