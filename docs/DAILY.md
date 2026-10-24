@@ -370,3 +370,20 @@ flaky           1.07s
 产出：`tools/bench.py`（`--quick` / `--json` / `--n`）、`docs/PERF.md`（含「这份基准不证明什么」）、CI 两个平台各跑一次 `--quick` 冒烟（2,000 条事件 + 阈值），两条测试锁住阈值与文档里的数字一致（30,000 / 500 MB 必须与代码里的常量对得上）。
 
 数字：三仓 0 star；Traffic 0；253 passed；bench 30k 全绿
+## 2026-10-25（自循环第 22 轮 · 从看板下钻到事件）
+
+产出：`regress --html --html-views`（256 passed）。之前看板只能看到「run-1 FAIL」，想知道它到底做了什么都得另开终端。现在每个 run id 都是链接，点进去是那一份 cassette 的事件浏览页。
+
+一个必须记下的设计冲突：仓库里原有测试断言「HTML 报告是**单文件**」。这个承诺（`demo` 也依赖它：单文件、零依赖、离线可开）比下钻更重要，所以**下钻做成 opt-in**，默认仍只出一个文件。
+
+```
+$ agenttest regress examples --assert before:quote_error --out rep --html --html-views
+报告        html -> rep\index.html
+报告        run_views -> rep\runs
+$ ls rep/runs
+bad.html  good.html
+```
+
+三条测试锁住：链接存在且目标文件真的是自包含页（无外部 http）、`run_views` 进 report.written、以及**没有 tools/ 时看板照常出、只是没有链接**（用 monkeypatch 模拟只装了 wheel 的情况）。
+
+数字：三仓 0 star；Traffic 0；256 passed
