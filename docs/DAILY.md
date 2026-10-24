@@ -491,3 +491,4 @@ stat: 走另一个入口（agenttest stat 读 batch.jsonl），CI 的 console-sc
 另一条测试专门证明这个 lint **不是恒真**：往文档里塞一条 `agenttest definitely-not-a-verb`，它必须红，然后恢复原文。
 
 数字：三仓 0 star；Traffic 0；280 passed
+
