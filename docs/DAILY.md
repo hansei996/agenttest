@@ -124,3 +124,14 @@ $ python tools/validate_cassette.py out/
 为什么这条重要：两种语言各自独立实现后算出的哈希能被同一份校验器接受 —— 这就证明 `CASSETTE-SPEC.md` 不再是本仓库的私有约定，而是可被第三方实现的格式。对应测试 `tests/test_emit_node.py`（没装 node 自动跳过）。
 
 数字：三仓 0 star；Traffic 0；228 passed
+## 2026-10-24（自循环第 9 轮）
+
+产出：`agenttest plan` 样本量规划（commit `bacf890`，232 passed）。一条命令回答「我想主张失败率 ≤10%，得跑多少次」：
+```
+  目标下界   需要次数   可排除失败率
+  0.90       35         > 10%
+  0.99       381        > 1%
+```
+它不引入新算法——复用 `flaky.runs_needed` 与 `wilson_interval`，存在的理由是让那个数字**可被查**，而不是埋在某条备注里。加了 4 条测试（含「runs_needed 与 plan 必须一致」这条交叉校验）。
+
+数字：三仓 0 star；Traffic 0；232 passed
