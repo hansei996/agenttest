@@ -161,7 +161,7 @@ def render(items):
         "",
         "- 完整测试套件（" + TICK + "python -m pytest tests -q" + TICK + "）——它本身就是证据，不重复列。",
         "- Windows 与 Linux 的差异：CI 两个平台各跑一次，看 Actions 记录才算数。",
-        "- 性能与规模：大 cassette 的渲染上限只在代码里写死，没有基准测试。",
+        "- 性能与规模：见 [docs/PERF.md](./PERF.md)（30k 事件四条路径的实测耗时与上限说明）。",
         "",
     ]
     return chr(10).join(lines)

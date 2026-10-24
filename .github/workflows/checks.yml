@@ -37,6 +37,10 @@ jobs:
         env:
           PYTHONPATH: src
         run: python tools/dogfood.py
+      - name: performance smoke (2k events, thresholds)
+        env:
+          PYTHONPATH: src
+        run: python tools/bench.py --quick
       - name: cli acceptance
         env:
           PYTHONPATH: src
@@ -111,3 +115,7 @@ jobs:
         env:
           PYTHONPATH: src
         run: python tools/dogfood.py
+      - name: performance smoke (2k events, thresholds)
+        env:
+          PYTHONPATH: src
+        run: python tools/bench.py --quick
