@@ -326,3 +326,25 @@ $ python tools/cassette_view.py examples/good
 同时诚实记录：**这只是把门擦干净，不等于有人敲门。** 如果两周后 Traffic 仍是 0，说明问题不在这层，得换假设。
 
 数字：三仓 0 star；Traffic 0；249 passed
+## 2026-10-24（自循环第 20 轮 · 让所有主张可复跑）
+
+产出：`tools/verify_all.py` + 自动生成的 `docs/VERIFY.md`（251 passed）。
+
+```
+$ python tools/verify_all.py
+PASS  demo 一条命令自证：好 cassette PASS、坏 cassette FAIL
+PASS  坏行为必须被断言抓住（replay 非零退出）
+PASS  校验器接受合规 cassette（12 条规则）
+PASS  校验器拒绝被篡改的 cassette
+PASS  Node 独立实现写出的 cassette 通过 Python 校验器
+PASS  统计主张有确切样本量：失败率 <=1% 需 381 次运行
+PASS  查看器当场重算哈希链，断链时非零退出
+PASS  剥掉编码环境变量后，中文输出仍按 UTF-8 可读
+结果：8 / 8 通过
+```
+
+为什么值得花一轮：前 19 轮攒下的断言全都散在聊天记录和 commit message 里 —— **等于没有**。现在每条都是「主张 → 命令 → 结果」，`docs/VERIFY.md` 由脚本生成（手改无效，另有测试锁结构）。
+
+清单末尾专门写了**这份清单不覆盖什么**：完整测试套件、双平台差异、性能与规模。不写这一节，这份清单就会被当成全部证据 —— 那正是我们一直在批评的做法。
+
+数字：三仓 0 star；Traffic 0；251 passed；verify_all 8/8
