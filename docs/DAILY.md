@@ -109,3 +109,18 @@
 诚实边界：提取器**不做 source-map 重映射**，页面里写明了这一点以及正确做法（先开 source map，别改 dist）。原本还想写「容器日志」那一页，但本机没有 docker，无法给出真实输出，所以这轮**只写了一页**，不编造命令结果。
 
 数字：三仓 0 star；Traffic 0；227 passed
+## 2026-10-24（自循环第 8 轮）
+
+产出：跨语言证明（commit `4aeb672`）——`examples/emit-node/emit.mjs` 用 Node **从零**写出一份 cassette，不 import agenttest、不装任何包，自己实现规范里的三项要求（键按码点升序、逗号冒号后无空格、非 ASCII 原样输出）并算 sha256 链。
+
+实测：
+```
+$ node examples/emit-node/emit.mjs out/
+wrote 6 records to out/cassette.jsonl
+$ python tools/validate_cassette.py out/
+  结果: PASS（12 条规则全部通过）
+```
+
+为什么这条重要：两种语言各自独立实现后算出的哈希能被同一份校验器接受 —— 这就证明 `CASSETTE-SPEC.md` 不再是本仓库的私有约定，而是可被第三方实现的格式。对应测试 `tests/test_emit_node.py`（没装 node 自动跳过）。
+
+数字：三仓 0 star；Traffic 0；228 passed
