@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: checks-${{ github.ref }}
-  # 只在 PR 上取消旧的 run；main 上的 push 让它跑完 —— 否则快速连推会把证据全取消掉
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  # 每个 commit 一个组：连推时不会有任何一个 run 被取消（实测 cancel-in-progress 表达式没达到预期）
+  group: checks-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
 
 jobs:
   tests:
