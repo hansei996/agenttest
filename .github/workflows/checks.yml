@@ -8,7 +8,8 @@ on:
 
 concurrency:
   group: checks-${{ github.ref }}
-  cancel-in-progress: true
+  # 只在 PR 上取消旧的 run；main 上的 push 让它跑完 —— 否则快速连推会把证据全取消掉
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   tests:
