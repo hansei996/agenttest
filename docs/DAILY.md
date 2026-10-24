@@ -284,3 +284,16 @@ $ python tools/cassette_view.py examples/good
 **一次不可复现的红，记录在此**：改完 README 第一次跑全量时 `test_broken_chain_is_loud_and_exits_nonzero` 红了一次；单跑它绿，随后连续两次全量 243 passed。按我们自己的规则，这属于「n 小、不能下结论」——先记为环境性抖动，若下一轮再出现，就用 `agenttest flaky` 的思路去量化它，而不是靠记忆判断。
 
 数字：三仓 0 star；Traffic 0；243 passed
+## 2026-10-24（自循环第 17 轮 · 把「抖动」量化，然后它不是抖动）
+
+上一轮我记了一条「不可复现的红」。这一轮按我们自己的规则先量化：同一条测试连跑 10 次。
+
+**10 次全红。** 它不是抖动 —— 之前那次「两次全绿」是因为我机器上设了 `PYTHONIOENCODING=utf-8`，而测试用子进程跑时没有这个变量。
+
+根因（用户可见的真 bug）：`tools/cassette_view.py` 没把 stdout 钉成 UTF-8。Windows 控制台默认 cp936，父进程按 utf-8 解码就是乱码，于是「哈希链在第 6 行断了」这种提示对任何按 UTF-8 读的调用方都是天书。仓库里 `tools/validate_cassette.py` 早有 `_force_utf8()`，注释里甚至写着「Linux CI 看不出来，Windows 上一 clone 就红」——**新加的查看器漏抄了这一段**。
+
+修法：给查看器补同样的 `_force_utf8()`，并加一条回归测试 —— 显式剥掉 `PYTHONIOENCODING` / `PYTHONUTF8` 跑子进程，按 UTF-8 解码，断言中文提示真的能读。
+
+结果：`10 次里失败 0 次`，244 passed。
+
+教训写在 DAILY 里：**「一次绿」不构成证据，就像我们不能用 5 次全过主张稳定。** 上一轮我把它记成环境抖动是诚实的；这一轮跑 10 次把它证伪，也是同一套规则在起作用。
