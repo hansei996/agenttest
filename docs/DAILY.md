@@ -146,3 +146,19 @@ $ python tools/validate_cassette.py out/
 过程：这轮手工改模板踩了两次语法错（多留一个 `return (`、结尾多一个 `)`），都是 `py_compile` 当场抓到的。手工 patch 源码 + 立刻编译，是这轮唯一没翻车的原因。
 
 数字：三仓 0 star；Traffic 0；235 passed
+## 2026-10-24（自循环第 11 轮）
+
+产出：`agenttest init`（239 passed）。在任意仓库一条命令生成最小回归骨架，**只新建文件、不覆盖任何已有文件**，重复 init 会拒绝：
+```
+$ agenttest init --dir my-repo
+已在 my-repo 生成骨架：
+  + my-repo/.agenttest/README.md
+  + my-repo/.agenttest/asserts.txt
+  + my-repo/tests/test_agent_behaviour.py
+下一步：
+  1) agenttest record runs/latest -- python -m your_agent "your task"
+  2) AGENTTEST_CASSETTE=runs/latest pytest tests/test_agent_behaviour.py
+```
+4 条测试锁住三个安全属性：生成三个文件、二次 init 拒绝、**已有测试文件绝不覆盖**（那条专门写了「先放一个自己的测试文件，init 必须失败且文件内容不变」）。
+
+数字：三仓 0 star；Traffic 0；239 passed
