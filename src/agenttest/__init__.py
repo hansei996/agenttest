@@ -6,13 +6,14 @@
 
 __version__ = "0.4.0"
 
-from . import assertions, cassette, diff, events, guard, regress, stat  # noqa: F401
+from . import assertions, cassette, diff, emit, events, guard, regress, stat  # noqa: F401
 
 __all__ = [
     "__version__",
     "assertions",
     "cassette",
     "diff",
+    "emit",
     "events",
     "guard",
     "regress",
